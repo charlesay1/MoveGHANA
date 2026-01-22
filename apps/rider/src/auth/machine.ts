@@ -5,6 +5,7 @@ export const initialAuthState: AuthState = {
   phone: '',
   otp: '',
   requestId: undefined,
+  maskedPhone: undefined,
   token: undefined,
   user: undefined,
   profile: { firstName: '', lastName: '', email: '', acceptedTerms: false },
@@ -24,6 +25,8 @@ export const authReducer = (state: AuthState, action: AuthAction): AuthState => 
       return { ...state, otp: action.otp };
     case 'SET_REQUEST_ID':
       return { ...state, requestId: action.requestId };
+    case 'SET_MASKED_PHONE':
+      return { ...state, maskedPhone: action.maskedPhone };
     case 'SET_TOKEN':
       return { ...state, token: action.token };
     case 'SET_USER':

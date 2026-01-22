@@ -16,6 +16,7 @@
     "@nestjs/platform-express": "^10.3.10",
     "@nestjs/throttler": "^6.4.0",
     "@nestjs/websockets": "^10.3.10",
+    "@movegh/types": "workspace:*",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "reflect-metadata": "^0.2.2",

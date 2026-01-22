@@ -95,6 +95,7 @@ pnpm --filter movegh-rider ios
 - `EXPO_PUBLIC_API_URL=http://<your-ip>:4000`
 - API: put server-specific values in `services/api/.env` (copy from `services/api/.env.example`).
   - `DATABASE_URL=postgres://movegh:movegh@localhost:5432/movegh`
+  - `JWT_SECRET=change-me`
 
 ### Troubleshooting
 - Docker not running: start Docker Desktop and retry `docker compose up -d`.

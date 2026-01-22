@@ -1,4 +1,14 @@
-export type AuthStep = 'welcome' | 'phone' | 'otp' | 'profile' | 'location' | 'home';
+export type AppStep =
+  | 'welcome'
+  | 'phone'
+  | 'otp'
+  | 'profile'
+  | 'location'
+  | 'home'
+  | 'destination'
+  | 'vehicle'
+  | 'fare'
+  | 'request';
 
 export type Profile = {
   firstName: string;
@@ -8,10 +18,11 @@ export type Profile = {
 };
 
 export type AuthState = {
-  step: AuthStep;
+  step: AppStep;
   phone: string;
   otp: string;
   requestId?: string;
+  maskedPhone?: string;
   token?: string;
   user?: {
     id: string;
@@ -27,11 +38,12 @@ export type AuthState = {
 };
 
 export type AuthAction =
-  | { type: 'NEXT'; next: AuthStep }
-  | { type: 'BACK'; prev: AuthStep }
+  | { type: 'NEXT'; next: AppStep }
+  | { type: 'BACK'; prev: AppStep }
   | { type: 'SET_PHONE'; phone: string }
   | { type: 'SET_OTP'; otp: string }
   | { type: 'SET_REQUEST_ID'; requestId?: string }
+  | { type: 'SET_MASKED_PHONE'; maskedPhone?: string }
   | { type: 'SET_TOKEN'; token?: string }
   | { type: 'SET_USER'; user?: AuthState['user'] }
   | { type: 'SET_LOCATION_READY'; value: boolean }

@@ -8,6 +8,14 @@
     "icon": "../../assets/brand/icon-app.svg",
     "splash": {
       "backgroundColor": "#FFFFFF"
+    },
+    "ios": {
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "moveGH uses your location to find pickup points and routes."
+      }
+    },
+    "android": {
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
     }
   }
 }

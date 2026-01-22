@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors } from '@movegh/theme';
+import { colors } from '../theme/colors';
 
 type Props = { message: string; tone?: 'info' | 'error' };
 
@@ -20,7 +20,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FDECEC',
   },
   text: {
-    color: colors.charcoal,
+    color: colors.black,
     fontSize: 12,
   },
 });

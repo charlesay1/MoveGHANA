@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useReducer, useRef, useState } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 import { decode as atob } from 'base-64';
-import type { AuthStep, Profile } from '../auth/types';
+import type { AppStep, Profile } from '../auth/types';
 import { authReducer, initialAuthState } from '../auth/machine';
 import {
   clearSession,
@@ -12,9 +12,9 @@ import {
   saveToken,
   saveUser,
 } from '../auth/storage';
-import { authStart, authVerify } from '../api/auth';
-import { getMe, healthCheck, updateProfile as updateUserProfile } from '../api/user';
-import { clearAuthToken, setAuthToken } from '../api/client';
+import { startAuth as startAuthRequest, verifyAuth } from '../services/authService';
+import { getMe, healthCheck, updateProfile as updateUserProfile } from '../services/userService';
+import { clearAuthToken, setAuthToken } from '../services/apiClient';
 
 type ApiStatus = 'unknown' | 'reachable' | 'unreachable';
 
@@ -24,7 +24,7 @@ type SessionContextValue = {
   isOnline: boolean;
   apiStatus: ApiStatus;
   bannerMessage?: string;
-  goTo: (step: AuthStep) => void;
+  goTo: (step: AppStep) => void;
   startAuth: (phone: string) => Promise<void>;
   verifyOtp: (requestId: string | undefined, code: string) => Promise<void>;
   resendOtp: () => Promise<void>;
@@ -144,8 +144,9 @@ export const SessionProvider: React.FC<React.PropsWithChildren> = ({ children })
 
   const startAuth = async (phone: string) => {
     dispatch({ type: 'SET_PHONE', phone });
-    const res = await authStart({ phone });
+    const res = await startAuthRequest({ phone });
     dispatch({ type: 'SET_REQUEST_ID', requestId: res.requestId });
+    dispatch({ type: 'SET_MASKED_PHONE', maskedPhone: res.maskedPhone });
     dispatch({ type: 'NEXT', next: 'otp' });
   };
 
@@ -154,7 +155,7 @@ export const SessionProvider: React.FC<React.PropsWithChildren> = ({ children })
       throw new Error('Request expired. Please resend the code.');
     }
     dispatch({ type: 'SET_OTP', otp: code });
-    const res = await authVerify({ requestId, code });
+    const res = await verifyAuth({ requestId, code });
     setAuthToken(res.token);
     dispatch({ type: 'SET_TOKEN', token: res.token });
     const me = await getMe();
@@ -165,8 +166,9 @@ export const SessionProvider: React.FC<React.PropsWithChildren> = ({ children })
 
   const resendOtp = async () => {
     if (!state.phone) throw new Error('Enter a phone number first.');
-    const res = await authStart({ phone: state.phone });
+    const res = await startAuthRequest({ phone: state.phone });
     dispatch({ type: 'SET_REQUEST_ID', requestId: res.requestId });
+    dispatch({ type: 'SET_MASKED_PHONE', maskedPhone: res.maskedPhone });
   };
 
   const updateProfile = async (profile: Profile) => {
@@ -216,7 +218,7 @@ export const useSession = () => {
 const routeAfterAuth = (
   user: { firstName?: string },
   locationReady: boolean,
-  dispatch: React.Dispatch<{ type: 'NEXT'; next: AuthStep }>,
+  dispatch: React.Dispatch<{ type: 'NEXT'; next: AppStep }>,
 ) => {
   if (!user.firstName) {
     dispatch({ type: 'NEXT', next: 'profile' });

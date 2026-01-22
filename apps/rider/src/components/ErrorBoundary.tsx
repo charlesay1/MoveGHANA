@@ -1,6 +1,6 @@
 import React from 'react';
 import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
-import { colors } from '@movegh/theme';
+import { colors } from '../theme/colors';
 
 type State = { hasError: boolean };
 

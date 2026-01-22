@@ -1,5 +1,5 @@
 import type { UpdateProfileRequest, UpdateProfileResponse, UserMeResponse } from '@movegh/types';
-import { request } from './client';
+import { request } from './apiClient';
 
 export const getMe = () => request<UserMeResponse>('/users/me');
 

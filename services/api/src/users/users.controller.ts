@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Req, UseGuards, UnauthorizedException } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Req, UseGuards, UnauthorizedException } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 
@@ -17,6 +17,17 @@ export class UsersController {
   @Patch('profile')
   @UseGuards(JwtAuthGuard)
   update(
+    @Req() req: { user: { id: string } },
+    @Body() body: { firstName: string; lastName?: string; email?: string },
+  ) {
+    const user = this.users.updateProfile(req.user.id, body);
+    if (!user) throw new UnauthorizedException('User not found.');
+    return user;
+  }
+
+  @Post('profile')
+  @UseGuards(JwtAuthGuard)
+  createOrUpdate(
     @Req() req: { user: { id: string } },
     @Body() body: { firstName: string; lastName?: string; email?: string },
   ) {

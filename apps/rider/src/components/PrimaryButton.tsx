@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
-import { colors } from '@movegh/theme';
+import { colors } from '../theme/colors';
 
 type Props = {
   label: string;

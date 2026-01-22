@@ -18,9 +18,7 @@ export const clearAuthToken = () => {
 
 export const getApiBaseUrl = () => {
   const baseUrl = process.env.EXPO_PUBLIC_API_URL;
-  if (!baseUrl) {
-    throw new Error('EXPO_PUBLIC_API_URL is not set.');
-  }
+  if (!baseUrl) throw new Error('EXPO_PUBLIC_API_URL is not set.');
   return baseUrl;
 };
 
@@ -67,9 +65,7 @@ export const request = async <T>(path: string, options: RequestOptions = {}): Pr
         await sleep(300 * (attempt + 1));
         continue;
       }
-      if (isAbort) {
-        throw new Error('Request timed out. Please try again.');
-      }
+      if (isAbort) throw new Error('Request timed out. Please try again.');
       throw error instanceof Error ? error : new Error('Network error.');
     } finally {
       clearTimeout(timeout);

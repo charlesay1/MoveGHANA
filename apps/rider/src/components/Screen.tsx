@@ -1,6 +1,6 @@
 import React from 'react';
 import { SafeAreaView, StyleSheet, View } from 'react-native';
-import { colors } from '@movegh/theme';
+import { colors } from '../theme/colors';
 
 export const Screen: React.FC<React.PropsWithChildren> = ({ children }) => (
   <SafeAreaView style={styles.safe}>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
-import { colors } from '@movegh/theme';
+import { colors } from '../theme/colors';
 
 type Props = {
   label: string;
@@ -20,7 +20,7 @@ export const Field: React.FC<Props> = ({ label, ...rest }) => (
 
 const styles = StyleSheet.create({
   wrapper: { marginBottom: 16 },
-  label: { fontSize: 14, fontWeight: '600', marginBottom: 8, color: colors.charcoal },
+  label: { fontSize: 14, fontWeight: '600', marginBottom: 8, color: colors.black },
   input: {
     borderWidth: 1,
     borderColor: '#D9DCE2',

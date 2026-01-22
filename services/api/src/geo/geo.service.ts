@@ -18,8 +18,15 @@ export class GeoService {
 
   getLandmarks() {
     return [
-      { id: 'lm1', name: 'Kwame Nkrumah Circle', cityId: 'accra', type: 'junction' },
-      { id: 'lm2', name: 'Kejetia Market', cityId: 'kumasi', type: 'market' },
+      {
+        id: 'lm1',
+        name: 'Kwame Nkrumah Circle',
+        cityId: 'accra',
+        type: 'junction',
+        lat: 5.5677,
+        lng: -0.2111,
+      },
+      { id: 'lm2', name: 'Kejetia Market', cityId: 'kumasi', type: 'market', lat: 6.6873, lng: -1.6244 },
     ];
   }
 }

@@ -10,7 +10,7 @@ export type User = {
 };
 
 export type AuthStartRequest = { phone: string };
-export type AuthStartResponse = { requestId: string; maskedPhone: string };
+export type AuthStartResponse = { requestId: string; maskedPhone: string; expiresInSeconds: number };
 export type AuthVerifyRequest = { requestId: string; code: string };
 export type AuthVerifyResponse = { token: string; user: { id: string; phone: string; role: 'rider' } };
 export type UserMeResponse = {
@@ -32,7 +32,14 @@ export type DriverProfile = {
 
 export type Region = { id: string; name: string; capital: string };
 export type City = { id: string; name: string; regionId: string };
-export type Landmark = { id: string; name: string; cityId: string; type: string };
+export type Landmark = {
+  id: string;
+  name: string;
+  cityId: string;
+  type: string;
+  lat?: number;
+  lng?: number;
+};
 export type RolloutPhase = 'phase_1' | 'phase_2' | 'phase_3';
 
 export type TripStatus =
@@ -44,6 +51,28 @@ export type TripStatus =
   | 'cancelled';
 
 export type TransportMode = 'car' | 'motorbike' | 'pragya' | 'aboboyaa';
+
+export type RideStatus = 'searching' | 'matched' | 'cancelled';
+
+export type RideRequestPayload = {
+  pickup: { label: string; lat: number; lng: number };
+  dropoff: { label: string; lat: number; lng: number };
+  mode: TransportMode;
+  distanceKm: number;
+  fare: number;
+};
+
+export type RideResponse = {
+  rideId: string;
+  status: RideStatus;
+  etaMinutes: number;
+  fare: number;
+  mode: TransportMode;
+};
+
+export type RideStatusResponse = RideResponse;
+
+export type RideEstimate = { price: number; etaMinutes: number };
 
 export type Trip = {
   id: string;

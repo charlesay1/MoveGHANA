@@ -6,6 +6,7 @@ import { UsersModule } from './users/users.module';
 import { GeoModule } from './geo/geo.module';
 import { TripGateway } from './ws/trip.gateway';
 import { HealthController } from './health.controller';
+import { RidesModule } from './rides/rides.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { HealthController } from './health.controller';
     AuthModule,
     UsersModule,
     GeoModule,
+    RidesModule,
   ],
   controllers: [HealthController],
   providers: [

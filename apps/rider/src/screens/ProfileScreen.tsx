@@ -1,10 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, Switch, Text, View } from 'react-native';
-import { colors } from '@movegh/theme';
+import { colors } from '../theme/colors';
+import { typography } from '../theme/typography';
 import { Field } from '../components/Field';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { Screen } from '../components/Screen';
 import type { Profile } from '../auth/types';
+import { useToast } from '../context/ToastProvider';
 
 type Props = {
   profile: Profile;
@@ -13,27 +15,33 @@ type Props = {
 };
 
 export const ProfileScreen: React.FC<Props> = ({ profile, onSubmit, onBack }) => {
-  const [firstName, setFirstName] = useState(profile.firstName);
-  const [lastName, setLastName] = useState(profile.lastName || '');
+  const initialFullName = [profile.firstName, profile.lastName].filter(Boolean).join(' ');
+  const [fullName, setFullName] = useState(initialFullName);
   const [email, setEmail] = useState(profile.email || '');
   const [acceptedTerms, setAcceptedTerms] = useState(profile.acceptedTerms);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const toast = useToast();
 
-  const valid = useMemo(() => firstName.trim().length > 1 && acceptedTerms, [firstName, acceptedTerms]);
+  const valid = useMemo(() => fullName.trim().length > 1 && acceptedTerms, [fullName, acceptedTerms]);
 
   const handleSubmit = async () => {
     setError('');
     setLoading(true);
     try {
+      const parts = fullName.trim().split(/\s+/);
+      const firstName = parts.shift() ?? '';
+      const lastName = parts.length ? parts.join(' ') : undefined;
       await onSubmit({
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
+        firstName,
+        lastName,
         email: email.trim(),
         acceptedTerms,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to update profile.');
+      const message = err instanceof Error ? err.message : 'Unable to update profile.';
+      setError(message);
+      toast.show(message, 'error');
     } finally {
       setLoading(false);
     }
@@ -41,9 +49,9 @@ export const ProfileScreen: React.FC<Props> = ({ profile, onSubmit, onBack }) =>
 
   return (
     <Screen>
-      <Text style={styles.title}>Your profile</Text>
-      <Field label="First name" value={firstName} onChangeText={setFirstName} />
-      <Field label="Last name (optional)" value={lastName} onChangeText={setLastName} />
+      <Text style={styles.title}>Set up your account</Text>
+      <Text style={styles.subtitle}>This helps drivers find you.</Text>
+      <Field label="Full name" value={fullName} onChangeText={setFullName} />
       <Field
         label="Email (optional)"
         value={email}
@@ -73,8 +81,9 @@ export const ProfileScreen: React.FC<Props> = ({ profile, onSubmit, onBack }) =>
 };
 
 const styles = StyleSheet.create({
-  title: { fontSize: 24, fontWeight: '700', color: colors.charcoal, marginBottom: 8 },
-  error: { color: colors.ghRed, marginBottom: 12 },
+  title: { ...typography.h2, color: colors.black, marginBottom: 8 },
+  subtitle: { color: colors.slate, marginBottom: 16 },
+  error: { color: colors.danger, marginBottom: 12 },
   terms: { flexDirection: 'row', alignItems: 'center', marginTop: 12, marginBottom: 24 },
   termsText: { marginLeft: 12, color: colors.slate },
   row: { gap: 12 },
