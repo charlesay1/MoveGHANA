@@ -19,6 +19,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/services/api/dist ./dist
 COPY --from=build /app/services/api/package.json ./package.json
+COPY --from=build /app/services/locations ./locations
 RUN npm pkg set type=commonjs >/dev/null 2>&1 || true
 EXPOSE 4000
 CMD ["node", "dist/main.js"]

@@ -1,18 +1,32 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import type { RideRequestPayload, RideResponse, RideStatusResponse, TransportMode } from '@movegh/types';
-import { estimateFare, getRideStatus, requestRide } from '../services/rideService';
+import type {
+  FareEstimateResponse,
+  RideRequestPayload,
+  RideResponse,
+  RideStatusResponse,
+  TransportMode,
+} from '@movegh/types';
+import { estimateFare as estimateFareApi } from '../services/fareService';
+import { getRideStatus, requestRide } from '../services/rideService';
 import { calculateDistanceKm } from '../utils/geo';
+import {
+  clearRecentLocations,
+  loadRecentLocations,
+  saveRecentLocation,
+  type RecentLocation,
+} from '../services/landmarkSearchService';
 
 export type BookingState = {
-  pickup?: { label: string; latitude: number; longitude: number };
-  destination?: { label: string; latitude: number; longitude: number };
+  pickup?: { label: string; latitude: number; longitude: number; regionId?: string };
+  destination?: { label: string; latitude: number; longitude: number; regionId?: string };
   distanceKm: number;
   mode?: TransportMode;
-  fare?: { price: number; etaMinutes: number };
+  fare?: FareEstimateResponse;
   ride?: RideResponse;
   status?: RideStatusResponse;
   searching: boolean;
   error?: string;
+  recentLocations: RecentLocation[];
 };
 
 type BookingContextValue = BookingState & {
@@ -20,6 +34,8 @@ type BookingContextValue = BookingState & {
   setDestination: (destination: BookingState['destination']) => void;
   setMode: (mode: TransportMode) => void;
   request: () => Promise<void>;
+  addRecent: (location: RecentLocation) => Promise<void>;
+  clearRecents: () => Promise<void>;
   reset: () => void;
 };
 
@@ -35,7 +51,12 @@ export const BookingProvider: React.FC<React.PropsWithChildren> = ({ children })
   const [status, setStatus] = useState<RideStatusResponse | undefined>(undefined);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
+  const [recentLocations, setRecentLocations] = useState<RecentLocation[]>([]);
   const pollerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    loadRecentLocations().then(setRecentLocations);
+  }, []);
 
   useEffect(() => {
     if (pickup && destination) {
@@ -46,7 +67,32 @@ export const BookingProvider: React.FC<React.PropsWithChildren> = ({ children })
         destination.longitude,
       );
       setDistanceKm(dist);
-      if (mode) setFare(estimateFare(dist, mode));
+      if (mode) {
+        estimateFareApi({
+          pickup: { lat: pickup.latitude, lng: pickup.longitude },
+          destination: { lat: destination.latitude, lng: destination.longitude },
+          mode,
+          regionId: destination.regionId || pickup.regionId,
+          distanceKm: dist,
+        })
+          .then(setFare)
+          .catch(() => {
+            setFare({
+              currency: 'GHS',
+              distanceKm: dist,
+              regionId: destination.regionId || pickup.regionId || 'unknown',
+              mode,
+              breakdown: {
+                baseFare: 4,
+                distanceFare: Number((dist * 2.1).toFixed(2)),
+                regionMultiplier: 1,
+                vehicleMultiplier: 1,
+                total: Number((4 + dist * 2.1).toFixed(2)),
+              },
+              total: Number((4 + dist * 2.1).toFixed(2)),
+            });
+          });
+      }
     } else {
       setDistanceKm(0);
       setFare(undefined);
@@ -77,7 +123,7 @@ export const BookingProvider: React.FC<React.PropsWithChildren> = ({ children })
         dropoff: { label: destination.label, lat: destination.latitude, lng: destination.longitude },
         mode,
         distanceKm,
-        fare: fare.price,
+        fare: fare.total,
       };
       const res = await requestRide(payload);
       setRide(res);
@@ -118,6 +164,16 @@ export const BookingProvider: React.FC<React.PropsWithChildren> = ({ children })
     setSearching(false);
   };
 
+  const addRecent = async (location: RecentLocation) => {
+    const next = await saveRecentLocation(location);
+    setRecentLocations(next);
+  };
+
+  const clearRecents = async () => {
+    await clearRecentLocations();
+    setRecentLocations([]);
+  };
+
   return (
     <BookingContext.Provider
       value={{
@@ -130,10 +186,13 @@ export const BookingProvider: React.FC<React.PropsWithChildren> = ({ children })
         status,
         searching,
         error,
+        recentLocations,
         setPickup,
         setDestination,
         setMode,
         request,
+        addRecent,
+        clearRecents,
         reset,
       }}
     >

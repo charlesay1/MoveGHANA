@@ -7,6 +7,7 @@ import { GeoModule } from './geo/geo.module';
 import { TripGateway } from './ws/trip.gateway';
 import { HealthController } from './health.controller';
 import { RidesModule } from './rides/rides.module';
+import { FareModule } from './fare/fare.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { RidesModule } from './rides/rides.module';
     UsersModule,
     GeoModule,
     RidesModule,
+    FareModule,
   ],
   controllers: [HealthController],
   providers: [

@@ -25,7 +25,12 @@ export const FarePreviewScreen: React.FC<{ onRequest: () => void; onBack: () => 
         <Text style={styles.label}>Distance</Text>
         <Text style={styles.value}>{distanceKm.toFixed(1)} km</Text>
         <Text style={styles.label}>Price</Text>
-        <Text style={styles.value}>GHS {fare?.price?.toFixed(2)}</Text>
+        <Text style={styles.value}>GHS {fare?.total?.toFixed(2)}</Text>
+        {fare && (
+          <Text style={styles.breakdown}>
+            Base {fare.breakdown.baseFare.toFixed(2)} · Distance {fare.breakdown.distanceFare.toFixed(2)} · Region x{fare.breakdown.regionMultiplier} · Vehicle x{fare.breakdown.vehicleMultiplier}
+          </Text>
+        )}
       </View>
       <TouchableOpacity style={[styles.cta, !canRequest && styles.ctaDisabled]} onPress={onRequest} disabled={!canRequest}>
         <Text style={styles.ctaText}>Request Ride</Text>
@@ -42,6 +47,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: colors.mist, padding: 16, borderRadius: 16, marginBottom: 16 },
   label: { color: colors.slate, marginTop: 8 },
   value: { ...typography.bodyLg, color: colors.black },
+  breakdown: { marginTop: 8, color: colors.slate, fontSize: 12 },
   cta: { backgroundColor: colors.ghGreen, padding: 14, borderRadius: 14, alignItems: 'center' },
   ctaDisabled: { opacity: 0.5 },
   ctaText: { color: colors.white, fontWeight: '700' },

@@ -1,4 +1,5 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
+import type { LandmarkCategory } from '@movegh/types';
 import { GeoService } from './geo.service';
 
 @Controller()
@@ -16,7 +17,18 @@ export class GeoController {
   }
 
   @Get('landmarks')
-  landmarks() {
-    return this.geo.getLandmarks();
+  landmarks(
+    @Query('q') query?: string,
+    @Query('category') category?: LandmarkCategory,
+    @Query('regionId') regionId?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = limit ? Number(limit) : undefined;
+    return this.geo.getLandmarks({
+      query,
+      category,
+      regionId,
+      limit: parsedLimit && !Number.isNaN(parsedLimit) ? parsedLimit : undefined,
+    });
   }
 }

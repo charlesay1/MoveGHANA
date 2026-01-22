@@ -36,8 +36,10 @@ export const VehicleSelectScreen: React.FC<{ onNext: () => void; onBack: () => v
         )}
       />
       <View style={styles.footer}>
-        <Text style={styles.price}>Est. fare: GHS {fare?.price?.toFixed(2) ?? '--'}</Text>
-        <Text style={styles.eta}>ETA: {fare?.etaMinutes ? `${fare.etaMinutes} min` : '--'}</Text>
+        <Text style={styles.price}>Est. fare: GHS {fare?.total?.toFixed(2) ?? '--'}</Text>
+        <Text style={styles.eta}>
+          {fare ? `Base: GHS ${fare.breakdown.baseFare.toFixed(2)} · Distance: GHS ${fare.breakdown.distanceFare.toFixed(2)}` : '--'}
+        </Text>
         <TouchableOpacity style={[styles.cta, !mode && styles.ctaDisabled]} onPress={onNext} disabled={!mode}>
           <Text style={styles.ctaText}>Continue</Text>
         </TouchableOpacity>

@@ -1,32 +1,31 @@
 import { Injectable } from '@nestjs/common';
+import type { LandmarkCategory } from '@movegh/types';
+import { LandmarkSearchService } from './landmark-search.service';
 
 @Injectable()
 export class GeoService {
+  constructor(private readonly search: LandmarkSearchService) {}
+
   getRegions() {
-    return [
-      { id: 'gr1', name: 'Greater Accra', capital: 'Accra' },
-      { id: 'as1', name: 'Ashanti', capital: 'Kumasi' },
-    ];
+    return this.search.getRegions();
   }
 
   getCities() {
     return [
-      { id: 'accra', name: 'Accra', regionId: 'gr1' },
-      { id: 'kumasi', name: 'Kumasi', regionId: 'as1' },
+      { id: 'accra', name: 'Accra', regionId: 'greater_accra' },
+      { id: 'kumasi', name: 'Kumasi', regionId: 'ashanti' },
     ];
   }
 
-  getLandmarks() {
-    return [
-      {
-        id: 'lm1',
-        name: 'Kwame Nkrumah Circle',
-        cityId: 'accra',
-        type: 'junction',
-        lat: 5.5677,
-        lng: -0.2111,
-      },
-      { id: 'lm2', name: 'Kejetia Market', cityId: 'kumasi', type: 'market', lat: 6.6873, lng: -1.6244 },
-    ];
+  getLandmarks(params?: { query?: string; category?: LandmarkCategory; regionId?: string; limit?: number }) {
+    if (!params || (!params.query && !params.category && !params.regionId)) {
+      return this.search.getLandmarks();
+    }
+    return this.search.search({
+      query: params.query,
+      category: params.category,
+      regionId: params.regionId,
+      limit: params.limit,
+    });
   }
 }

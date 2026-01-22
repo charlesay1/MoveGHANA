@@ -1,6 +1,5 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import * as Location from 'expo-location';
-import { searchLandmarks } from '../services/locationService';
 
 export type LocationState = {
   status: Location.PermissionStatus | 'undetermined';
@@ -14,7 +13,6 @@ type LocationContextValue = LocationState & {
   refreshLocation: () => Promise<void>;
   startTracking: () => Promise<void>;
   stopTracking: () => void;
-  lookupLandmarks: (query: string) => Promise<{ id: string; name: string; lat?: number; lng?: number }[]>;
 };
 
 const LocationContext = createContext<LocationContextValue | null>(null);
@@ -66,7 +64,6 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
     watcher.current = null;
   };
 
-  const lookupLandmarks = useCallback((query: string) => searchLandmarks(query), []);
 
   useEffect(() => {
     Location.getForegroundPermissionsAsync().then((result) => {
@@ -86,7 +83,6 @@ export const LocationProvider: React.FC<React.PropsWithChildren> = ({ children }
         refreshLocation,
         startTracking,
         stopTracking,
-        lookupLandmarks,
       }}
     >
       {children}
