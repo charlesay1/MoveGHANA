@@ -4,7 +4,9 @@ node_modules
 .env.*
 !.env.example
 !.env.local.example
+!.env.development.example
 !.env.staging.example
+!.env.production.example
 !.env.prod.example
 .DS_Store
 .dist

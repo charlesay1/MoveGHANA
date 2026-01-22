@@ -8,6 +8,11 @@ describe('AuthController (e2e)', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
+    process.env.JWT_SECRET = 'test-secret-123456';
+    process.env.NODE_ENV = 'test';
+    process.env.CORS_ORIGINS = 'http://localhost:3000';
+    process.env.DATABASE_URL = 'postgres://movegh:movegh@localhost:5432/movegh';
+
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();

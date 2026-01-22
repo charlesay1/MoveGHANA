@@ -6,9 +6,10 @@ export class HealthController {
   status() {
     return {
       status: 'ok',
+      service: 'movegh-api',
       version: process.env.APP_VERSION || 'dev',
-      environment: process.env.NODE_ENV || 'development',
-      uptime: process.uptime(),
+      env: process.env.NODE_ENV || 'development',
+      timestamp: new Date().toISOString(),
     };
   }
 }

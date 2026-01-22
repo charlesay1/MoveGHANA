@@ -3,10 +3,10 @@ import { resolve } from 'node:path';
 
 const args = process.argv.slice(2);
 const targetArg = args.find((arg) => arg.startsWith('--target='));
-const target = targetArg ? targetArg.split('=')[1] : 'local';
+const target = targetArg ? targetArg.split('=')[1] : 'development';
 
 const required = {
-  api: ['DATABASE_URL', 'JWT_SECRET', 'PORT'],
+  api: ['DATABASE_URL', 'JWT_SECRET', 'PORT', 'NODE_ENV', 'CORS_ORIGINS'],
   rider: ['EXPO_PUBLIC_API_URL'],
   driver: ['EXPO_PUBLIC_API_URL'],
   business: ['NEXT_PUBLIC_API_URL'],
@@ -15,9 +15,15 @@ const required = {
 
 const getEnvFile = (baseDir, name) => {
   const envTarget = resolve(baseDir, `.env.${target}`);
+  const envDev = resolve(baseDir, '.env.development');
+  const envStage = resolve(baseDir, '.env.staging');
+  const envProd = resolve(baseDir, '.env.production');
   const envLocal = resolve(baseDir, `.env.local`);
   const envDefault = resolve(baseDir, '.env');
   if (existsSync(envTarget)) return envTarget;
+  if (existsSync(envDev)) return envDev;
+  if (existsSync(envStage)) return envStage;
+  if (existsSync(envProd)) return envProd;
   if (existsSync(envLocal)) return envLocal;
   if (existsSync(envDefault)) return envDefault;
   return null;

@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { GeoModule } from './geo/geo.module';
@@ -6,8 +8,22 @@ import { TripGateway } from './ws/trip.gateway';
 import { HealthController } from './health.controller';
 
 @Module({
-  imports: [AuthModule, UsersModule, GeoModule],
+  imports: [
+    ThrottlerModule.forRoot({
+      ttl: 60,
+      limit: 100,
+    }),
+    AuthModule,
+    UsersModule,
+    GeoModule,
+  ],
   controllers: [HealthController],
-  providers: [TripGateway],
+  providers: [
+    TripGateway,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

@@ -10,7 +10,7 @@ export class AuthService {
     string,
     { phone: string; code: string; expiresAt: number }
   >();
-  private readonly jwtSecret = process.env.JWT_SECRET || 'movegh-dev-secret';
+  private readonly jwtSecret = process.env.JWT_SECRET ?? '';
 
   constructor(private readonly users: UsersService) {}
 

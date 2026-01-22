@@ -92,7 +92,7 @@ pnpm --filter movegh-rider ios
 ### Environment variables
 - Root env: put shared values in `.env` (copy from `.env.example`).
 - Rider app: put app-specific values in `apps/rider/.env` (copy from `apps/rider/.env.example`).
-  - `EXPO_PUBLIC_API_URL=http://localhost:4000`
+- `EXPO_PUBLIC_API_URL=http://<your-ip>:4000`
 - API: put server-specific values in `services/api/.env` (copy from `services/api/.env.example`).
   - `DATABASE_URL=postgres://movegh:movegh@localhost:5432/movegh`
 
