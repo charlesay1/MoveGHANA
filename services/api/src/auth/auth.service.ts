@@ -41,7 +41,9 @@ export class AuthService {
       lockedUntil: null,
     });
 
-    console.log(`[moveGH OTP] ${normalized} -> ${code}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[moveGH OTP] ${normalized} -> ${code}`);
+    }
 
     return {
       requestId,

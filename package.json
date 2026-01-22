@@ -21,6 +21,7 @@
     "check:urls": "bash scripts/check-urls.sh",
     "check:ports": "node scripts/check-ports.mjs",
     "check:env": "node scripts/check-env.mjs",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm check:urls",
     "check:secrets": "bash scripts/secret-scan.sh",
     "check:no-env": "bash scripts/check-no-env.sh",
     "changeset": "changeset",
