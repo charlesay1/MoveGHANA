@@ -1,0 +1,30 @@
+:root {
+  --red: #ce1126;
+  --yellow: #fcd116;
+  --green: #006b3f;
+  --black: #101214;
+  --white: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Manrope', 'Segoe UI', Arial, sans-serif;
+  background: radial-gradient(circle at top, #f7faf9, #eef2f0 60%, #e1e7e2 100%);
+  color: var(--black);
+}
+
+main {
+  min-height: 100vh;
+  padding: 48px;
+}
+
+.card {
+  background: var(--white);
+  border-radius: 24px;
+  padding: 32px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+}

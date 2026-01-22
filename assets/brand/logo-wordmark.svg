@@ -1,0 +1,6 @@
+<svg width="240" height="80" viewBox="0 0 240 80" xmlns="http://www.w3.org/2000/svg">
+  <rect width="240" height="80" fill="#FFFFFF"/>
+  <text x="20" y="52" font-family="Inter, Arial, sans-serif" font-size="40" font-weight="700" fill="#101214">move</text>
+  <text x="128" y="52" font-family="Inter, Arial, sans-serif" font-size="40" font-weight="800" fill="#006B3F">GH</text>
+  <rect x="20" y="60" width="200" height="6" fill="#CE1126"/>
+</svg>

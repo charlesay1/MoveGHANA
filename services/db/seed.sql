@@ -1,0 +1,17 @@
+INSERT INTO regions (name, capital) VALUES
+  ('Ahafo', 'Goaso'),
+  ('Ashanti', 'Kumasi'),
+  ('Bono', 'Sunyani'),
+  ('Bono East', 'Techiman'),
+  ('Central', 'Cape Coast'),
+  ('Eastern', 'Koforidua'),
+  ('Greater Accra', 'Accra'),
+  ('North East', 'Nalerigu'),
+  ('Northern', 'Tamale'),
+  ('Oti', 'Dambai'),
+  ('Savannah', 'Damongo'),
+  ('Upper East', 'Bolgatanga'),
+  ('Upper West', 'Wa'),
+  ('Volta', 'Ho'),
+  ('Western', 'Sekondi-Takoradi'),
+  ('Western North', 'Sefwi Wiawso');

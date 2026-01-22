@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "moveGH Rider",
+    "slug": "movegh-rider",
+    "scheme": "movegh-rider",
+    "orientation": "portrait",
+    "platforms": ["ios", "android"],
+    "icon": "../../assets/brand/icon-app.svg",
+    "splash": {
+      "backgroundColor": "#FFFFFF"
+    }
+  }
+}

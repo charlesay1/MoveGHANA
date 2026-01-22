@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install
+      - run: pnpm lint
+      - run: pnpm check:urls
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm --filter movegh-api build
+      - run: pnpm --filter movegh-business build
+      - run: pnpm --filter movegh-admin build

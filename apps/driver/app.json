@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "moveGH Driver",
+    "slug": "movegh-driver",
+    "scheme": "movegh-driver",
+    "orientation": "portrait",
+    "platforms": ["ios", "android"],
+    "icon": "../../assets/brand/icon-app.svg",
+    "splash": {
+      "backgroundColor": "#FFFFFF"
+    }
+  }
+}

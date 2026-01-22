@@ -1,0 +1,30 @@
+:root {
+  --red: #ce1126;
+  --yellow: #fcd116;
+  --green: #006b3f;
+  --black: #101214;
+  --white: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Space Grotesk', 'Segoe UI', Arial, sans-serif;
+  background: linear-gradient(135deg, #111418, #1b1f24 50%, #262c33 100%);
+  color: var(--white);
+}
+
+main {
+  min-height: 100vh;
+  padding: 48px;
+}
+
+.panel {
+  background: #1f252c;
+  border-radius: 20px;
+  padding: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
