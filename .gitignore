@@ -8,6 +8,12 @@ node_modules
 !.env.staging.example
 !.env.production.example
 !.env.prod.example
+!.env.development
+!.env.test
+!.env.production
+/services/db/data/
+/services/db/secrets/
+/services/api/secrets/
 .DS_Store
 .dist
 .next

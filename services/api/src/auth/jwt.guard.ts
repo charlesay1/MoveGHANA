@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  private readonly jwtSecret = process.env.JWT_SECRET || 'movegh-dev-secret';
+  private readonly jwtSecret = process.env.JWT_SECRET ?? '';
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();

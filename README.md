@@ -38,7 +38,7 @@ pnpm install
 ## Run Commands
 ### Database (Postgres)
 ```bash
-docker compose -f services/db/docker-compose.yml up -d
+docker compose up -d
 ```
 
 ### Backend API (NestJS)
@@ -73,7 +73,6 @@ pnpm --filter movegh-admin dev
 ## Run moveGH locally (DB + API + Rider)
 ### Database (Postgres)
 ```bash
-cd services/db
 docker compose up -d
 ```
 
@@ -93,9 +92,39 @@ pnpm --filter movegh-rider ios
 - Root env: put shared values in `.env` (copy from `.env.example`).
 - Rider app: put app-specific values in `apps/rider/.env` (copy from `apps/rider/.env.example`).
 - `EXPO_PUBLIC_API_URL=http://<your-ip>:4000`
-- API: put server-specific values in `services/api/.env` (copy from `services/api/.env.example`).
-  - `DATABASE_URL=postgres://movegh:movegh@localhost:5432/movegh`
-  - `JWT_SECRET=change-me`
+- API layered env files:
+  - `services/api/.env.development`
+  - `services/api/.env.test`
+  - `services/api/.env.production`
+  - `services/api/.env.example` as a template
+  - Never commit real secrets; use placeholders only.
+
+## Runbook (API + DB)
+### Commands
+```bash
+docker compose up -d
+pnpm install
+pnpm --filter movegh-api env:check
+pnpm --filter movegh-api db:migrate
+pnpm --filter movegh-api db:status
+pnpm --filter movegh-api db:rollback
+pnpm --filter movegh-api dev
+```
+
+### Curl checks
+```bash
+curl http://localhost:4000/health
+curl http://localhost:4000/ready
+curl http://localhost:4000/metrics
+```
+
+### Expected outputs (brief)
+- `/health`: `{"status":"ok",...,"requestId":"..."}`
+- `/ready`: `{"status":"ok|degraded","dependencies":{"db":"up|down","migrations":"up|down"},...}`
+- `/metrics`: Prometheus text format (starts with `# HELP`)
+
+## CI Gate Placeholder
+- Add to CI: `pnpm --filter movegh-api env:check`
 
 ### Troubleshooting
 - Docker not running: start Docker Desktop and retry `docker compose up -d`.

@@ -6,6 +6,10 @@
     "dev": "nest start --watch",
     "build": "nest build",
     "start": "node dist/main.js",
+    "env:check": "node -r ts-node/register src/config/env.check.ts",
+    "db:migrate": "node -r ts-node/register src/migrations/cli.ts up",
+    "db:rollback": "node -r ts-node/register src/migrations/cli.ts down",
+    "db:status": "node -r ts-node/register src/migrations/status.ts",
     "test": "jest",
     "lint": "eslint src --max-warnings=0",
     "typecheck": "tsc -p tsconfig.json --noEmit"
@@ -17,11 +21,23 @@
     "@nestjs/throttler": "^6.4.0",
     "@nestjs/websockets": "^10.3.10",
     "@movegh/types": "workspace:*",
+    "dotenv": "^16.4.5",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.50.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.52.1",
+    "@opentelemetry/resources": "^1.25.1",
+    "@opentelemetry/sdk-node": "^0.52.1",
+    "@opentelemetry/sdk-trace-base": "^1.25.1",
+    "pg": "^8.11.5",
+    "pino": "^9.3.2",
+    "pino-http": "^9.0.0",
+    "prom-client": "^15.1.2",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "ws": "^8.17.1"
+    "ws": "^8.17.1",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.4.4",
@@ -30,7 +46,9 @@
     "@types/express": "^4.17.21",
     "@types/jest": "^29.5.12",
     "jest": "^29.7.0",
+    "node-pg-migrate": "^7.7.0",
     "supertest": "^6.3.4",
+    "ts-node": "^10.9.2",
     "ts-jest": "^29.2.5",
     "typescript": "^5.6.3"
   }

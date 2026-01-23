@@ -1,0 +1,126 @@
+services:
+  postgres:
+    image: postgres:16.2
+    container_name: movegh-postgres
+    hostname: movegh-postgres
+    user: "999:999"
+    restart: always
+    env_file:
+      - ./services/db/.env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-movegh_core}
+      POSTGRES_USER: ${POSTGRES_USER:-movegh_admin}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+      TZ: UTC
+    expose:
+      - "5432"
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-movegh_admin} -d ${POSTGRES_DB:-movegh_core} -h 127.0.0.1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    volumes:
+      - ./services/db/data/postgres:/var/lib/postgresql/data
+      - ./services/db/data/backups:/backups
+      - ./services/db/schema:/docker-entrypoint-initdb.d:ro
+      - ./services/db/migrations:/opt/movegh/migrations:ro
+    networks:
+      movegh_network:
+        aliases:
+          - db-postgres
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "${POSTGRES_CPU_LIMIT:-1.0}"
+          memory: "${POSTGRES_MEM_LIMIT:-1024M}"
+        reservations:
+          cpus: "${POSTGRES_CPU_RESERVATION:-0.25}"
+          memory: "${POSTGRES_MEM_RESERVATION:-256M}"
+    mem_limit: "${POSTGRES_MEM_LIMIT:-1024M}"
+    cpus: "${POSTGRES_CPU_LIMIT:-1.0}"
+    stop_grace_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    secrets:
+      - postgres_password
+
+  movegh-api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+      target: runtime
+    container_name: movegh-api
+    hostname: movegh-api
+    restart: always
+    env_file:
+      - ./services/api/.env
+    ports:
+      - "127.0.0.1:${API_PORT:-4000}:4000"
+    expose:
+      - "4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - movegh_network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "${API_CPU_LIMIT:-1.0}"
+          memory: "${API_MEM_LIMIT:-1024M}"
+        reservations:
+          cpus: "${API_CPU_RESERVATION:-0.25}"
+          memory: "${API_MEM_RESERVATION:-256M}"
+    mem_limit: "${API_MEM_LIMIT:-1024M}"
+    cpus: "${API_CPU_LIMIT:-1.0}"
+    stop_grace_period: 30s
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/nodejs/bin/node",
+          "-e",
+          "require('http').get('http://127.0.0.1:4000/ready',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    secrets:
+      - jwt_secret
+      - database_url
+
+networks:
+  movegh_network:
+    name: movegh_network
+    internal: true
+
+secrets:
+  postgres_password:
+    file: ./services/db/secrets/postgres_password
+  jwt_secret:
+    file: ./services/api/secrets/jwt_secret
+  database_url:
+    file: ./services/api/secrets/database_url

@@ -6,8 +6,10 @@ import { UsersModule } from './users/users.module';
 import { GeoModule } from './geo/geo.module';
 import { TripGateway } from './ws/trip.gateway';
 import { HealthController } from './health.controller';
+import { MetricsController } from './metrics/metrics.controller';
 import { RidesModule } from './rides/rides.module';
 import { FareModule } from './fare/fare.module';
+import { DbModule } from './db/db.module';
 
 @Module({
   imports: [
@@ -15,13 +17,14 @@ import { FareModule } from './fare/fare.module';
       ttl: 60,
       limit: 100,
     }),
+    DbModule,
     AuthModule,
     UsersModule,
     GeoModule,
     RidesModule,
     FareModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, MetricsController],
   providers: [
     TripGateway,
     {
