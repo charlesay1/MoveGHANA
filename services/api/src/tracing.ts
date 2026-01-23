@@ -10,12 +10,15 @@ loadEnv();
 
 diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.ERROR);
 
+const nodeEnv = process.env.NODE_ENV || 'development';
 process.env.OTEL_SERVICE_NAME = process.env.OTEL_SERVICE_NAME || 'movegh-api';
 
 const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 const traceExporter = otlpEndpoint
   ? new OTLPTraceExporter({ url: otlpEndpoint })
-  : new ConsoleSpanExporter();
+  : nodeEnv === 'development'
+    ? new ConsoleSpanExporter()
+    : undefined;
 
 const sdk = new NodeSDK({
   resource: new Resource({
