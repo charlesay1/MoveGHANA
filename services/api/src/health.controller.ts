@@ -1,6 +1,8 @@
 import { Controller, Get, HttpStatus, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { DbService } from './db/db.module';
+import { config } from './config/config';
+import net from 'net';
 
 @Controller()
 export class HealthController {
@@ -21,7 +23,9 @@ export class HealthController {
   @Get('ready')
   async ready(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const readiness = await this.db.readiness();
-    const ok = readiness.dbUp && readiness.migrationsApplied;
+    const redisStatus = await this.checkRedis();
+    const redisOk = redisStatus === 'up' || redisStatus === 'not_configured';
+    const ok = readiness.dbUp && readiness.migrationsApplied && redisOk;
     res.status(ok ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE);
     return {
       status: ok ? 'ok' : 'degraded',
@@ -29,6 +33,7 @@ export class HealthController {
       dependencies: {
         db: readiness.dbUp ? 'up' : 'down',
         migrations: readiness.migrationsApplied ? 'up' : 'down',
+        redis: redisStatus,
       },
       timestamp: new Date().toISOString(),
       requestId: req.requestId,
@@ -43,5 +48,28 @@ export class HealthController {
       timestamp: new Date().toISOString(),
       requestId: req.requestId,
     };
+  }
+
+  private async checkRedis(): Promise<'up' | 'down' | 'not_configured'> {
+    if (!config.REDIS_URL) return 'not_configured';
+    try {
+      const url = new URL(config.REDIS_URL);
+      const port = Number(url.port || '6379');
+      const host = url.hostname;
+      const reachable = await new Promise<boolean>((resolve) => {
+        const socket = net.createConnection({ host, port, timeout: 1000 }, () => {
+          socket.end();
+          resolve(true);
+        });
+        socket.on('error', () => resolve(false));
+        socket.on('timeout', () => {
+          socket.destroy();
+          resolve(false);
+        });
+      });
+      return reachable ? 'up' : 'down';
+    } catch {
+      return 'down';
+    }
   }
 }

@@ -47,4 +47,8 @@ export const config = {
   CORS_ORIGINS: corsOrigins,
   LOG_LEVEL: env.LOG_LEVEL,
   APP_VERSION: env.APP_VERSION || 'dev',
+  RATE_LIMIT_GLOBAL: env.RATE_LIMIT_GLOBAL,
+  RATE_LIMIT_AUTH: env.RATE_LIMIT_AUTH,
+  BODY_LIMIT: env.BODY_LIMIT || '1mb',
+  REDIS_URL: env.REDIS_URL,
 };

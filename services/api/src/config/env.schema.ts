@@ -13,6 +13,10 @@ export const envSchema = z.object({
   APP_VERSION: z.string().optional().default('dev'),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
   OTEL_SERVICE_NAME: z.string().optional(),
+  RATE_LIMIT_GLOBAL: z.coerce.number().int().positive().default(100),
+  RATE_LIMIT_AUTH: z.coerce.number().int().positive().default(5),
+  BODY_LIMIT: z.string().optional().default('1mb'),
+  REDIS_URL: z.string().optional(),
 });
 
 export type EnvSchema = z.infer<typeof envSchema>;

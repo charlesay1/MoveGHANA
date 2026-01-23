@@ -1,9 +1,12 @@
 import 'reflect-metadata';
 import './tracing';
 import helmet from 'helmet';
+import express from 'express';
 import { NestFactory } from '@nestjs/core';
+import { context, trace } from '@opentelemetry/api';
 import pino from 'pino';
 import pinoHttp from 'pino-http';
+import rateLimit from 'express-rate-limit';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { config } from './config/config';
@@ -21,7 +24,10 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
   app.enableShutdownHooks();
+  app.disable('x-powered-by');
   app.use(helmet());
+  app.use(express.json({ limit: config.BODY_LIMIT }));
+  app.use(express.urlencoded({ extended: true, limit: config.BODY_LIMIT }));
 
   const corsOrigins = config.CORS_ORIGINS;
 
@@ -41,6 +47,13 @@ async function bootstrap() {
     },
   });
 
+  const getTraceIds = () => {
+    const span = trace.getSpan(context.active());
+    if (!span) return { trace_id: 'n/a', span_id: 'n/a' };
+    const { traceId, spanId } = span.spanContext();
+    return { trace_id: traceId, span_id: spanId };
+  };
+
   const logger = pino({
     level: config.LOG_LEVEL,
     base: {
@@ -49,16 +62,39 @@ async function bootstrap() {
       version: config.APP_VERSION,
     },
     timestamp: pino.stdTimeFunctions.isoTime,
+    mixin: () => getTraceIds(),
   });
 
   initMetrics();
   app.use(requestIdMiddleware);
+  const globalLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: config.RATE_LIMIT_GLOBAL,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) => req.path === '/health' || req.path === '/live',
+    handler: (_req, res) => {
+      res.status(429).json({ error: 'rate_limited', retry_after: 60 });
+    },
+  });
+  const authLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: config.RATE_LIMIT_AUTH,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (_req, res) => {
+      res.status(429).json({ error: 'rate_limited', retry_after: 60 });
+    },
+  });
+  app.use('/auth/otp', authLimiter);
+  app.use('/auth/verify', authLimiter);
+  app.use(globalLimiter);
   app.use(metricsMiddleware);
   app.use(
     pinoHttp({
       logger,
       genReqId: (req) => req.requestId,
-      customProps: (req) => ({ requestId: req.requestId }),
+      customProps: (req) => ({ requestId: req.requestId, ...getTraceIds() }),
       redact: ['req.headers.authorization', 'req.headers.cookie', 'req.headers["set-cookie"]'],
       serializers: {
         req(req) {
