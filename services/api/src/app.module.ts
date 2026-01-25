@@ -12,6 +12,7 @@ import { FareModule } from './fare/fare.module';
 import { DbModule } from './db/db.module';
 import { PaymentsModule } from './payments/payments.module';
 import { OpsModule } from './ops/ops.module';
+import { FinosModule } from './modules/finos/finos.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { OpsModule } from './ops/ops.module';
     FareModule,
     PaymentsModule,
     OpsModule,
+    FinosModule,
   ],
   controllers: [HealthController, MetricsController],
   providers: [

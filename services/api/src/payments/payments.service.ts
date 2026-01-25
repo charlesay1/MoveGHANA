@@ -99,7 +99,7 @@ export class PaymentsService implements OnModuleInit {
       const intentStatus = riskStatus === 'blocked' ? 'failed' : riskStatus === 'review' ? 'review' : 'created';
 
       const intentRes = await client.query<{ id: string; status: string }>(
-        'INSERT INTO payment_intents (rider_id, trip_id, amount, currency, provider, status, risk_score, risk_status, risk_reason, device_id, phone_hash) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id, status',
+        'INSERT INTO payment_intents (rider_id, trip_id, amount, currency, provider, status, risk_score, risk_status, risk_reason, device_id, phone_hash, phone, fees) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id, status',
         [
           input.riderId,
           input.tripId,
@@ -112,6 +112,8 @@ export class PaymentsService implements OnModuleInit {
           riskReason,
           fraud.deviceHash,
           fraud.phoneHash,
+          input.phoneNumber,
+          0,
         ]
       );
       const intentId = intentRes.rows[0].id;
@@ -154,6 +156,7 @@ export class PaymentsService implements OnModuleInit {
           payloadHash: this.hashPayload({ ...input, phoneNumber: 'redacted' }),
         });
         paymentsMetrics.intentTotal.inc({ provider: provider.name, status: intentStatus });
+        paymentsMetrics.paymentAttemptTotal.inc({ provider: provider.name, status: intentStatus });
         return response;
       }
 
@@ -211,6 +214,7 @@ export class PaymentsService implements OnModuleInit {
       });
 
       paymentsMetrics.intentTotal.inc({ provider: provider.name, status: nextStatus });
+      paymentsMetrics.paymentAttemptTotal.inc({ provider: provider.name, status: nextStatus });
       this.logger.info({
         msg: 'payment_intent_created',
         intentId,
@@ -316,6 +320,7 @@ export class PaymentsService implements OnModuleInit {
           payloadHash: this.hashPayload({ intentId: intent.id, status: 'failed' }),
         });
         paymentsMetrics.intentTotal.inc({ provider: provider.name, status: 'failed' });
+        paymentsMetrics.paymentAttemptTotal.inc({ provider: provider.name, status: 'failed' });
         return { intentId: intent.id, status: 'failed' };
       }
 
@@ -333,6 +338,7 @@ export class PaymentsService implements OnModuleInit {
           metadata: { action: 'intent_confirm', intentId: intent.id, response },
         });
         paymentsMetrics.intentTotal.inc({ provider: provider.name, status: 'authorized' });
+        paymentsMetrics.paymentAttemptTotal.inc({ provider: provider.name, status: 'authorized' });
         await this.insertAuditLog(client, {
           actor: intent.rider_id,
           action: 'payment_intent_authorized',
@@ -413,6 +419,7 @@ export class PaymentsService implements OnModuleInit {
       await this.updateTransactionResponse(client, idempotencyKey, response);
 
       paymentsMetrics.intentTotal.inc({ provider: provider.name, status: 'captured' });
+      paymentsMetrics.paymentAttemptTotal.inc({ provider: provider.name, status: 'captured' });
       this.logger.info({
         msg: 'payment_intent_captured',
         intentId: intent.id,
@@ -515,7 +522,9 @@ export class PaymentsService implements OnModuleInit {
 
       const response = { status: 'ok' };
       await this.updateTransactionResponse(client, idempotencyKey, response);
-      paymentsMetrics.intentTotal.inc({ provider: provider.name, status: status === 'review' ? 'review' : status });
+      const eventStatus = status === 'review' ? 'review' : status;
+      paymentsMetrics.intentTotal.inc({ provider: provider.name, status: eventStatus });
+      paymentsMetrics.paymentAttemptTotal.inc({ provider: provider.name, status: eventStatus });
       return response;
     });
   }
@@ -612,6 +621,7 @@ export class PaymentsService implements OnModuleInit {
       });
 
       paymentsMetrics.payoutTotal.inc({ provider: providerAdapter.name, status: payoutResult.status });
+      paymentsMetrics.payoutTotalPublic.inc({ provider: providerAdapter.name, status: payoutResult.status });
       return response;
     });
   }
