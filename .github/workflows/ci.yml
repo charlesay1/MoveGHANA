@@ -113,3 +113,11 @@ jobs:
       - run: pnpm check:no-env
       - run: node scripts/check-payments-prod.mjs
       - run: node scripts/check-payments-secrets.mjs
+      - run: pnpm --filter movegh-api env:check
+        env:
+          APP_ENV: dev
+          NODE_ENV: development
+          DATABASE_URL: postgresql://movegh_admin:movegh_admin_password@localhost:5432/movegh_core
+          JWT_SECRET: movegh-dev-secret
+          PAYMENTS_PROVIDER_MODE: mock
+          PAYMENTS_PROVIDER: mock
