@@ -5,6 +5,9 @@ import { getMetrics, register } from '../metrics/metrics';
 import { DbService } from '../db/db.module';
 import { PaymentsService } from '../payments/payments.service';
 import { SettlementService } from '../modules/settlement/settlement.service';
+import { FinosTreasuryService } from '../modules/finos/treasury/treasury.service';
+import { FinosReportingService } from '../modules/finos/reporting/reporting.service';
+import { FinosRiskService } from '../modules/finos/risk/risk.service';
 import { config } from '../config/config';
 
 @Controller('v1/ops')
@@ -12,7 +15,10 @@ export class OpsController {
   constructor(
     private readonly db: DbService,
     @Optional() private readonly payments?: PaymentsService,
-    @Optional() private readonly settlements?: SettlementService
+    @Optional() private readonly settlements?: SettlementService,
+    @Optional() private readonly treasury?: FinosTreasuryService,
+    @Optional() private readonly reporting?: FinosReportingService,
+    @Optional() private readonly risk?: FinosRiskService
   ) {}
 
   @Get('metrics')
@@ -91,5 +97,39 @@ export class OpsController {
       periodEnd,
     });
     return { status: 'ok', report };
+  }
+
+  @Get('treasury-status')
+  async treasuryStatus() {
+    if (!this.treasury) return { status: 'not_configured' };
+    return this.treasury.getTreasuryStatus('GHS');
+  }
+
+  @Post('treasury-rebalance')
+  async treasuryRebalance() {
+    return { status: 'noop', message: 'treasury rebalance hook' };
+  }
+
+  @Get('finos-report')
+  async finosReport() {
+    if (!this.reporting) return { status: 'not_configured' };
+    return this.reporting.dailySummary('GHS');
+  }
+
+  @Get('risk-cases')
+  async riskCases() {
+    if (!this.risk) return { status: 'not_configured' };
+    return this.risk.listRiskCases();
+  }
+
+  @Post('risk-cases/:id/resolve')
+  async resolveRiskCase(@Req() req: Request) {
+    if (!this.risk) return { status: 'not_configured' };
+    const id = req.params['id'];
+    const action = (req.query['action'] as string) || 'clear';
+    if (!['clear', 'block'].includes(action)) {
+      throw new BadRequestException('action must be clear or block');
+    }
+    return this.risk.resolveRiskCase(id, action as 'clear' | 'block');
   }
 }

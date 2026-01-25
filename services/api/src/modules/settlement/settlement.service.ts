@@ -63,6 +63,7 @@ export class SettlementService {
 
     if (drift !== null) {
       paymentsMetrics.ledgerDrift.set(drift);
+      paymentsMetrics.settlementDriftAmount.set(drift);
     }
     paymentsMetrics.reconciliationLag.set(0);
 

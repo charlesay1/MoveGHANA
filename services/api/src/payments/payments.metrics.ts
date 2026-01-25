@@ -6,9 +6,19 @@ export const paymentsMetrics = {
     help: 'Total payment intents by provider and status',
     labelNames: ['provider', 'status'] as const,
   }),
+  paymentAttemptTotal: new Counter({
+    name: 'payment_attempt_total',
+    help: 'Payment attempts by provider and status',
+    labelNames: ['provider', 'status'] as const,
+  }),
   payoutTotal: new Counter({
     name: 'payments_payouts_total',
     help: 'Total payouts by provider and status',
+    labelNames: ['provider', 'status'] as const,
+  }),
+  payoutTotalPublic: new Counter({
+    name: 'payout_total',
+    help: 'Payouts by provider and status',
     labelNames: ['provider', 'status'] as const,
   }),
   providerLatency: new Histogram({
@@ -32,6 +42,19 @@ export const paymentsMetrics = {
   ledgerDrift: new Gauge({
     name: 'payments_ledger_drift',
     help: 'Ledger drift detected by reconciliation',
+  }),
+  settlementDriftAmount: new Gauge({
+    name: 'settlement_drift_amount',
+    help: 'Settlement drift amount in currency units',
+  }),
+  ledgerInvariantFailTotal: new Counter({
+    name: 'ledger_invariant_fail_total',
+    help: 'Ledger invariant failures',
+  }),
+  escrowHoldTotal: new Counter({
+    name: 'escrow_hold_total',
+    help: 'Escrow holds by state',
+    labelNames: ['state'] as const,
   }),
   reconciliationLag: new Gauge({
     name: 'payments_reconciliation_lag_seconds',
