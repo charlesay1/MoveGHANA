@@ -67,6 +67,9 @@ jobs:
         env:
           DATABASE_URL: postgresql://movegh_admin:movegh_admin_password@localhost:5432/movegh_core
           JWT_SECRET: movegh-dev-secret
+      - run: node scripts/check-schema-drift.mjs
+        env:
+          DATABASE_URL: postgresql://movegh_admin:movegh_admin_password@localhost:5432/movegh_core
       - run: pnpm --filter movegh-api db:rollback
         env:
           DATABASE_URL: postgresql://movegh_admin:movegh_admin_password@localhost:5432/movegh_core
@@ -108,3 +111,5 @@ jobs:
       - run: pnpm check:ports
       - run: pnpm check:secrets
       - run: pnpm check:no-env
+      - run: node scripts/check-payments-prod.mjs
+      - run: node scripts/check-payments-secrets.mjs

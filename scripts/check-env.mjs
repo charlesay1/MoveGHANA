@@ -15,12 +15,16 @@ const required = {
 
 const getEnvFile = (baseDir, name) => {
   const envTarget = resolve(baseDir, `.env.${target}`);
+  const envDevShort = resolve(baseDir, '.env.dev');
+  const envProdShort = resolve(baseDir, '.env.prod');
   const envDev = resolve(baseDir, '.env.development');
   const envStage = resolve(baseDir, '.env.staging');
   const envProd = resolve(baseDir, '.env.production');
   const envLocal = resolve(baseDir, `.env.local`);
   const envDefault = resolve(baseDir, '.env');
   if (existsSync(envTarget)) return envTarget;
+  if (existsSync(envDevShort)) return envDevShort;
+  if (existsSync(envProdShort)) return envProdShort;
   if (existsSync(envDev)) return envDev;
   if (existsSync(envStage)) return envStage;
   if (existsSync(envProd)) return envProd;

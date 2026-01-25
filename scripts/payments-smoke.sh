@@ -21,6 +21,7 @@ DRIVER_ID="${DRIVER_ID:-driver_smoke}"
 PHONE_NUMBER="${PHONE_NUMBER:-233240000000}"
 TRIP_ID="${TRIP_ID:-trip_smoke}"
 AMOUNT="${AMOUNT:-25.50}"
+TREASURY_ID="${TREASURY_OWNER_ID:-movegh_treasury}"
 
 DB_URL="${DATABASE_URL:-}"
 if [ -z "$DB_URL" ] && [ -f "$ROOT/services/api/secrets/database_url" ]; then
@@ -60,14 +61,14 @@ PY
 )
 
 psql "$DB_URL" -v ON_ERROR_STOP=1 <<SQL
-WITH platform_wallet AS (
+WITH treasury_wallet AS (
   INSERT INTO wallets (owner_type, owner_id, currency, status)
-  VALUES ('platform','movegh','GHS','active')
+  VALUES ('platform','${TREASURY_ID}','GHS','active')
   ON CONFLICT (owner_type, owner_id, currency) DO UPDATE SET status = EXCLUDED.status
   RETURNING id
-), platform_pending AS (
+), treasury_pending AS (
   INSERT INTO ledger_accounts (wallet_id, type, currency, balance)
-  SELECT id, 'pending', 'GHS', 0 FROM platform_wallet
+  SELECT id, 'pending', 'GHS', 0 FROM treasury_wallet
   ON CONFLICT (wallet_id, type, currency) DO UPDATE SET wallet_id = EXCLUDED.wallet_id
   RETURNING id
 ), rider_wallet AS (
@@ -88,13 +89,13 @@ WITH platform_wallet AS (
 )
 UPDATE ledger_accounts SET balance = balance + ${AMOUNT} WHERE id IN (SELECT id FROM rider_available);
 
-UPDATE ledger_accounts SET balance = balance - ${AMOUNT} WHERE id IN (SELECT id FROM platform_pending);
+UPDATE ledger_accounts SET balance = balance - ${AMOUNT} WHERE id IN (SELECT id FROM treasury_pending);
 
 INSERT INTO ledger_entries (account_id, txn_id, direction, amount, balance_after)
 SELECT id, '${TOPUP_TXN}', 'credit', ${AMOUNT}, balance FROM ledger_accounts WHERE id IN (SELECT id FROM rider_available);
 
 INSERT INTO ledger_entries (account_id, txn_id, direction, amount, balance_after)
-SELECT id, '${TOPUP_TXN}', 'debit', ${AMOUNT}, balance FROM ledger_accounts WHERE id IN (SELECT id FROM platform_pending);
+SELECT id, '${TOPUP_TXN}', 'debit', ${AMOUNT}, balance FROM ledger_accounts WHERE id IN (SELECT id FROM treasury_pending);
 SQL
 
 INTENT_RES=$(curl -sS -X POST "$API_URL/v1/payments/intents" \
