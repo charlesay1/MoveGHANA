@@ -8,19 +8,23 @@ import { DbService } from '../db/db.module';
 import { CommissionService } from './commission/commission.service';
 import { LedgerService } from './ledger/ledger.service';
 import { normalizeAmount } from './ledger/ledger.types';
-import type { MomoProvider, MomoProviderName, WebhookEvent } from './providers/momo.provider.interface';
-import { MockProvider } from './providers/mock.provider';
-import { MtnProvider } from './providers/mtn.provider';
-import { VodafoneProvider } from './providers/vodafone.provider';
-import { AirtelTigoProvider } from './providers/airteltigo.provider';
+import type { PaymentProvider, ProviderContext, ProviderName } from '../modules/payments/providers/provider.interface';
+import { MockProvider } from '../modules/payments/providers/mock.provider';
+import { MtnMomoProvider } from '../modules/payments/providers/mtn.momo.provider';
+import { VodafoneCashProvider } from '../modules/payments/providers/vodafone.cash.provider';
+import { AirtelTigoMoneyProvider } from '../modules/payments/providers/airteltigo.money.provider';
 import { PayoutsService } from './payouts/payouts.service';
+import { FraudService } from './fraud/fraud.service';
+import { GovernanceService } from './governance/governance.service';
+import { paymentsMetrics } from './payments.metrics';
+import { buildWebhookIdempotencyKey } from './webhook.util';
 
 export type CreateIntentInput = {
   tripId: string;
   riderId: string;
   amount: number;
   currency: string;
-  provider: MomoProviderName;
+  provider: ProviderName;
   phoneNumber: string;
 };
 
@@ -43,17 +47,19 @@ export class PaymentsService implements OnModuleInit {
     },
   });
 
-  private readonly providers: Record<MomoProviderName, MomoProvider>;
+  private readonly providers: Record<ProviderName, PaymentProvider>;
 
   constructor(
     private readonly db: DbService,
     private readonly ledger: LedgerService,
     private readonly commission: CommissionService,
     private readonly payouts: PayoutsService,
+    private readonly fraud: FraudService,
+    private readonly governance: GovernanceService,
     mockProvider: MockProvider,
-    mtnProvider: MtnProvider,
-    vodafoneProvider: VodafoneProvider,
-    airtelTigoProvider: AirtelTigoProvider
+    mtnProvider: MtnMomoProvider,
+    vodafoneProvider: VodafoneCashProvider,
+    airtelTigoProvider: AirtelTigoMoneyProvider
   ) {
     this.providers = {
       mock: mockProvider,
@@ -64,8 +70,8 @@ export class PaymentsService implements OnModuleInit {
   }
 
   onModuleInit() {
-    if (config.PAYMENTS_PROVIDER !== 'mock') {
-      this.ensureProviderSecrets(config.PAYMENTS_PROVIDER);
+    if (config.PAYMENTS_PROVIDER_MODE === 'live' && config.PAYMENTS_PROVIDER === 'mock') {
+      throw new Error('PAYMENTS_PROVIDER cannot be mock in live mode.');
     }
   }
 
@@ -76,36 +82,115 @@ export class PaymentsService implements OnModuleInit {
 
       const amount = normalizeAmount(input.amount);
       const provider = this.getProvider(input.provider);
+      this.ensureProviderAllowed(provider.name);
 
-      const intentRes = await client.query<{ id: string; status: string }>(
-        'INSERT INTO payment_intents (rider_id, trip_id, amount, currency, provider, status) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, status',
-        [input.riderId, input.tripId, amount, input.currency, provider.name, 'created']
-      );
-      const intentId = intentRes.rows[0].id;
-
-      const providerResult = await provider.initiatePayment({
-        intentId,
+      const fraud = await this.fraud.assessPaymentRisk(client, {
+        riderId: input.riderId,
         amount,
         currency: input.currency,
         phoneNumber: input.phoneNumber,
-        riderId: input.riderId,
-        tripId: input.tripId,
+        deviceId: meta.deviceId,
+        ip: meta.ip,
+        country: meta.country,
       });
 
-      await client.query('UPDATE payment_intents SET provider_ref = $1, updated_at = now() WHERE id = $2', [
+      const riskStatus = fraud.status;
+      const riskReason = fraud.reasons.length > 0 ? fraud.reasons.join(';') : null;
+      const intentStatus = riskStatus === 'blocked' ? 'failed' : riskStatus === 'review' ? 'review' : 'created';
+
+      const intentRes = await client.query<{ id: string; status: string }>(
+        'INSERT INTO payment_intents (rider_id, trip_id, amount, currency, provider, status, risk_score, risk_status, risk_reason, device_id, phone_hash) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id, status',
+        [
+          input.riderId,
+          input.tripId,
+          amount,
+          input.currency,
+          provider.name,
+          intentStatus,
+          fraud.score,
+          riskStatus,
+          riskReason,
+          fraud.deviceHash,
+          fraud.phoneHash,
+        ]
+      );
+      const intentId = intentRes.rows[0].id;
+
+      if (fraud.reasons.length > 0) {
+        await this.fraud.recordFlags(client, {
+          intentId,
+          riderId: input.riderId,
+          reasons: fraud.reasons,
+          score: fraud.score,
+          details: {
+            amount,
+            currency: input.currency,
+            country: meta.country,
+          },
+        });
+      }
+
+      if (riskStatus !== 'clear') {
+        const response = { intentId, status: intentStatus, riskStatus };
+        await this.insertTransaction(client, {
+          type: 'payment',
+          status: intentStatus,
+          idempotencyKey,
+          metadata: {
+            action: 'intent_create',
+            intentId,
+            provider: provider.name,
+            risk: fraud,
+            response,
+          },
+        });
+        await this.insertAuditLog(client, {
+          actor: input.riderId,
+          action: 'payment_intent_flagged',
+          target: intentId,
+          requestId: meta.requestId,
+          ip: meta.ip,
+          userAgent: meta.userAgent,
+          payloadHash: this.hashPayload({ ...input, phoneNumber: 'redacted' }),
+        });
+        paymentsMetrics.intentTotal.inc({ provider: provider.name, status: intentStatus });
+        return response;
+      }
+
+      const ctx = this.buildProviderContext(idempotencyKey, meta);
+      const started = Date.now();
+      const providerResult = await provider.initiatePayment(
+        {
+          intentId,
+          amount,
+          currency: input.currency,
+          phoneNumber: input.phoneNumber,
+          riderId: input.riderId,
+          tripId: input.tripId,
+        },
+        ctx
+      );
+      paymentsMetrics.providerLatency.observe(
+        { provider: provider.name, action: 'initiate' },
+        (Date.now() - started) / 1000
+      );
+
+      const nextStatus = providerResult.status === 'authorized' ? 'authorized' : intentStatus;
+      await client.query('UPDATE payment_intents SET provider_ref = $1, status = $2, updated_at = now() WHERE id = $3', [
         providerResult.providerRef,
+        nextStatus,
         intentId,
       ]);
 
       const response = {
         intentId,
-        status: 'created',
+        status: nextStatus,
         checkoutInstructions: providerResult.checkoutInstructions,
       };
 
       await this.insertTransaction(client, {
         type: 'payment',
-        status: 'created',
+        status: nextStatus,
         idempotencyKey,
         metadata: {
           action: 'intent_create',
@@ -125,6 +210,7 @@ export class PaymentsService implements OnModuleInit {
         payloadHash: this.hashPayload(input),
       });
 
+      paymentsMetrics.intentTotal.inc({ provider: provider.name, status: nextStatus });
       this.logger.info({
         msg: 'payment_intent_created',
         intentId,
@@ -149,13 +235,37 @@ export class PaymentsService implements OnModuleInit {
         trip_id: string;
         amount: number;
         currency: string;
-        provider: MomoProviderName;
+        provider: ProviderName;
         provider_ref: string | null;
         status: string;
+        risk_status: string | null;
+        risk_score: number | null;
       }>('SELECT * FROM payment_intents WHERE id = $1 FOR UPDATE', [intentId]);
 
       const intent = intentRes.rows[0];
       if (!intent) throw new Error('Payment intent not found.');
+
+      if (intent.risk_status === 'review') {
+        const response = { intentId: intent.id, status: 'review' as const };
+        await this.insertTransaction(client, {
+          type: 'payment',
+          status: 'review',
+          idempotencyKey,
+          metadata: { action: 'intent_confirm', intentId, response },
+        });
+        return response;
+      }
+
+      if (intent.risk_status === 'blocked') {
+        const response = { intentId: intent.id, status: 'failed' as const };
+        await this.insertTransaction(client, {
+          type: 'payment',
+          status: 'failed',
+          idempotencyKey,
+          metadata: { action: 'intent_confirm', intentId, response },
+        });
+        return response;
+      }
 
       if (intent.status === 'captured') {
         const response = { intentId: intent.id, status: intent.status };
@@ -169,13 +279,24 @@ export class PaymentsService implements OnModuleInit {
       }
 
       const provider = this.getProvider(intent.provider);
-      const confirm = await provider.confirmPayment({
-        intentId: intent.id,
-        amount: Number(intent.amount),
-        currency: intent.currency,
-        phoneNumber: input.phoneNumber,
-        riderId: intent.rider_id,
-      });
+      this.ensureProviderAllowed(provider.name);
+      const ctx = this.buildProviderContext(idempotencyKey, meta);
+      const started = Date.now();
+      const confirm = await provider.verifyPayment(
+        {
+          intentId: intent.id,
+          providerRef: intent.provider_ref ?? undefined,
+          amount: Number(intent.amount),
+          currency: intent.currency,
+          phoneNumber: input.phoneNumber,
+          riderId: intent.rider_id,
+        },
+        ctx
+      );
+      paymentsMetrics.providerLatency.observe(
+        { provider: provider.name, action: 'verify' },
+        (Date.now() - started) / 1000
+      );
 
       if (confirm.status === 'failed') {
         await client.query('UPDATE payment_intents SET status = $1, updated_at = now() WHERE id = $2', ['failed', intent.id]);
@@ -194,6 +315,7 @@ export class PaymentsService implements OnModuleInit {
           userAgent: meta.userAgent,
           payloadHash: this.hashPayload({ intentId: intent.id, status: 'failed' }),
         });
+        paymentsMetrics.intentTotal.inc({ provider: provider.name, status: 'failed' });
         return { intentId: intent.id, status: 'failed' };
       }
 
@@ -210,6 +332,7 @@ export class PaymentsService implements OnModuleInit {
           idempotencyKey,
           metadata: { action: 'intent_confirm', intentId: intent.id, response },
         });
+        paymentsMetrics.intentTotal.inc({ provider: provider.name, status: 'authorized' });
         await this.insertAuditLog(client, {
           actor: intent.rider_id,
           action: 'payment_intent_authorized',
@@ -225,7 +348,7 @@ export class PaymentsService implements OnModuleInit {
       const driverId = input.driverId || 'driver_mock';
       const amount = normalizeAmount(Number(intent.amount));
 
-      const platformWallet = await this.ensureWallet(client, 'platform', 'movegh', intent.currency, ['escrow', 'available', 'pending']);
+      const platformWallets = await this.governance.ensurePlatformWallets(client, intent.currency);
       const riderWallet = await this.ensureWallet(client, 'rider', intent.rider_id, intent.currency, ['available']);
       const driverWallet = await this.ensureWallet(client, 'driver', driverId, intent.currency, ['available']);
 
@@ -247,15 +370,15 @@ export class PaymentsService implements OnModuleInit {
 
       await this.ledger.postTransfer(client, {
         fromAccountId: riderWallet.accounts.available,
-        toAccountId: platformWallet.accounts.escrow,
+        toAccountId: platformWallets.treasury.accounts.escrow,
         amount,
         txnId,
       });
 
       if (split.commission > 0) {
         await this.ledger.postTransfer(client, {
-          fromAccountId: platformWallet.accounts.escrow,
-          toAccountId: platformWallet.accounts.available,
+          fromAccountId: platformWallets.treasury.accounts.escrow,
+          toAccountId: platformWallets.revenue.accounts.available,
           amount: split.commission,
           txnId,
         });
@@ -263,7 +386,7 @@ export class PaymentsService implements OnModuleInit {
 
       if (split.net > 0) {
         await this.ledger.postTransfer(client, {
-          fromAccountId: platformWallet.accounts.escrow,
+          fromAccountId: platformWallets.treasury.accounts.escrow,
           toAccountId: driverWallet.accounts.available,
           amount: split.net,
           txnId,
@@ -289,6 +412,7 @@ export class PaymentsService implements OnModuleInit {
       const response = { intentId: intent.id, status: 'captured' as const };
       await this.updateTransactionResponse(client, idempotencyKey, response);
 
+      paymentsMetrics.intentTotal.inc({ provider: provider.name, status: 'captured' });
       this.logger.info({
         msg: 'payment_intent_captured',
         intentId: intent.id,
@@ -302,41 +426,45 @@ export class PaymentsService implements OnModuleInit {
     });
   }
 
-  async handleWebhook(providerName: MomoProviderName, payload: unknown, headers: Record<string, string | string[] | undefined>) {
+  async handleWebhook(providerName: ProviderName, payload: unknown, headers: Record<string, string | string[] | undefined>) {
     const provider = this.getProvider(providerName);
-    if (!provider.verifyWebhook(headers, payload)) {
-      throw new Error('Invalid webhook signature.');
+    this.ensureProviderAllowed(provider.name);
+    const event = provider.webhookHandler(headers, payload);
+    const idempotencyKey = buildWebhookIdempotencyKey(providerName, event.eventId);
+    if (event.timestamp) {
+      const delayMs = Date.now() - new Date(event.timestamp).getTime();
+      if (!Number.isNaN(delayMs) && delayMs >= 0) {
+        paymentsMetrics.webhookDelay.observe({ provider: provider.name }, delayMs / 1000);
+      }
     }
-
-    const event = provider.parseWebhook(payload);
-    const idempotencyKey = `webhook:${providerName}:${event.eventId}`;
 
     return this.db.transaction(async (client) => {
       const existing = await this.findIdempotentResponse(client, idempotencyKey);
       if (existing) return existing;
 
-      const intentRes = await client.query<{ id: string; rider_id: string; amount: number; currency: string; status: string; provider_ref: string | null }>(
+      const intentRes = await client.query<{ id: string; rider_id: string; amount: number; currency: string; status: string; provider_ref: string | null; risk_status: string | null }>(
         'SELECT * FROM payment_intents WHERE id = $1 FOR UPDATE',
         [event.intentId]
       );
       const intent = intentRes.rows[0];
       if (!intent) throw new Error('Payment intent not found.');
 
-      let status: 'captured' | 'failed' = 'failed';
+      let status: 'captured' | 'failed' | 'review' = 'failed';
       if (event.status === 'captured') status = 'captured';
+      if (intent.risk_status === 'review') status = 'review';
 
       const txnId = await this.insertTransaction(client, {
         type: 'payment',
-        status,
+        status: status === 'review' ? 'review' : status,
         idempotencyKey,
         metadata: { action: 'webhook', intentId: intent.id, provider: providerName, status, eventId: event.eventId },
       });
 
-      if (intent.status !== 'captured' && status === 'captured') {
+      if (intent.status !== 'captured' && status === 'captured' && intent.risk_status !== 'review') {
         const amount = normalizeAmount(Number(event.amount ?? intent.amount));
         const driverId = event.driverId || 'driver_mock';
 
-        const platformWallet = await this.ensureWallet(client, 'platform', 'movegh', intent.currency, ['escrow', 'available', 'pending']);
+        const platformWallets = await this.governance.ensurePlatformWallets(client, intent.currency);
         const riderWallet = await this.ensureWallet(client, 'rider', intent.rider_id, intent.currency, ['available']);
         const driverWallet = await this.ensureWallet(client, 'driver', driverId, intent.currency, ['available']);
 
@@ -345,15 +473,15 @@ export class PaymentsService implements OnModuleInit {
 
         await this.ledger.postTransfer(client, {
           fromAccountId: riderWallet.accounts.available,
-          toAccountId: platformWallet.accounts.escrow,
+          toAccountId: platformWallets.treasury.accounts.escrow,
           amount,
           txnId,
         });
 
         if (split.commission > 0) {
           await this.ledger.postTransfer(client, {
-            fromAccountId: platformWallet.accounts.escrow,
-            toAccountId: platformWallet.accounts.available,
+            fromAccountId: platformWallets.treasury.accounts.escrow,
+            toAccountId: platformWallets.revenue.accounts.available,
             amount: split.commission,
             txnId,
           });
@@ -361,7 +489,7 @@ export class PaymentsService implements OnModuleInit {
 
         if (split.net > 0) {
           await this.ledger.postTransfer(client, {
-            fromAccountId: platformWallet.accounts.escrow,
+            fromAccountId: platformWallets.treasury.accounts.escrow,
             toAccountId: driverWallet.accounts.available,
             amount: split.net,
             txnId,
@@ -370,7 +498,7 @@ export class PaymentsService implements OnModuleInit {
       }
 
       await client.query('UPDATE payment_intents SET status = $1, provider_ref = $2, updated_at = now() WHERE id = $3', [
-        status,
+        status === 'review' ? 'review' : status,
         event.providerRef || intent.provider_ref,
         intent.id,
       ]);
@@ -387,6 +515,7 @@ export class PaymentsService implements OnModuleInit {
 
       const response = { status: 'ok' };
       await this.updateTransactionResponse(client, idempotencyKey, response);
+      paymentsMetrics.intentTotal.inc({ provider: provider.name, status: status === 'review' ? 'review' : status });
       return response;
     });
   }
@@ -413,13 +542,15 @@ export class PaymentsService implements OnModuleInit {
     return { walletId, balances };
   }
 
-  async requestPayout(driverId: string, amount: number, provider: string, destination: string, idempotencyKey: string, meta: RequestMeta) {
+  async requestPayout(driverId: string, amount: number, provider: ProviderName, destination: string, idempotencyKey: string, meta: RequestMeta) {
     return this.db.transaction(async (client) => {
       const existing = await this.findIdempotentResponse(client, idempotencyKey);
       if (existing) return existing;
 
       const normalized = normalizeAmount(amount);
-      const platformWallet = await this.ensureWallet(client, 'platform', 'movegh', 'GHS', ['pending']);
+      const providerAdapter = this.getProvider(provider as ProviderName);
+      this.ensureProviderAllowed(providerAdapter.name);
+      const platformWallets = await this.governance.ensurePlatformWallets(client, 'GHS');
       const driverWallet = await this.ensureWallet(client, 'driver', driverId, 'GHS', ['available']);
 
       const txnId = await this.insertTransaction(client, {
@@ -436,11 +567,38 @@ export class PaymentsService implements OnModuleInit {
         provider,
         destination,
         txnId,
-        platformPendingAccountId: platformWallet.accounts.pending,
+        platformPendingAccountId: platformWallets.treasury.accounts.pending,
         driverAvailableAccountId: driverWallet.accounts.available,
       });
 
-      const response = { payoutId, status: 'queued' };
+      const ctx = this.buildProviderContext(idempotencyKey, meta);
+      const started = Date.now();
+      const payoutResult = await providerAdapter.payout(
+        {
+          payoutId,
+          driverId,
+          amount: normalized,
+          currency: 'GHS',
+          destination,
+        },
+        ctx
+      );
+      paymentsMetrics.providerLatency.observe(
+        { provider: providerAdapter.name, action: 'payout' },
+        (Date.now() - started) / 1000
+      );
+      paymentsMetrics.payoutDelay.observe(
+        { provider: providerAdapter.name, status: payoutResult.status },
+        (Date.now() - started) / 1000
+      );
+
+      await client.query('UPDATE payouts SET status = $1, provider_ref = $2 WHERE id = $3', [
+        payoutResult.status,
+        payoutResult.providerRef ?? null,
+        payoutId,
+      ]);
+
+      const response = { payoutId, status: payoutResult.status };
       await this.updateTransactionResponse(client, idempotencyKey, response);
 
       await this.insertAuditLog(client, {
@@ -453,38 +611,38 @@ export class PaymentsService implements OnModuleInit {
         payloadHash: this.hashPayload({ driverId, amount: normalized }),
       });
 
+      paymentsMetrics.payoutTotal.inc({ provider: providerAdapter.name, status: payoutResult.status });
       return response;
     });
   }
 
-  async providerHealth(providerName?: MomoProviderName) {
+  async providerHealth(providerName?: ProviderName) {
     const provider = this.getProvider(providerName || config.PAYMENTS_PROVIDER);
     return provider.healthCheck();
   }
 
-  private getProvider(name?: MomoProviderName): MomoProvider {
+  private getProvider(name?: ProviderName): PaymentProvider {
     const key = name || config.PAYMENTS_PROVIDER;
     const provider = this.providers[key];
     if (!provider) throw new Error('Unsupported payment provider.');
     return provider;
   }
 
-  private ensureProviderSecrets(provider: MomoProviderName) {
-    if (provider === 'mtn') {
-      if (!config.MTN_MOMO_API_KEY || !config.MTN_MOMO_API_SECRET) {
-        throw new Error('MTN MoMo secrets are required.');
-      }
+  private ensureProviderAllowed(provider: ProviderName) {
+    if (config.PAYMENTS_PROVIDER_MODE === 'live' && provider === 'mock') {
+      throw new Error('Mock provider is not allowed in live mode.');
     }
-    if (provider === 'vodafone') {
-      if (!config.VODAFONE_MOMO_API_KEY || !config.VODAFONE_MOMO_API_SECRET) {
-        throw new Error('Vodafone Cash secrets are required.');
-      }
+    if (config.PAYMENTS_PROVIDER_MODE === 'mock' && provider !== 'mock') {
+      throw new Error('Live provider is not allowed in mock mode.');
     }
-    if (provider === 'airteltigo') {
-      if (!config.AIRTELTIGO_MOMO_API_KEY || !config.AIRTELTIGO_MOMO_API_SECRET) {
-        throw new Error('AirtelTigo Money secrets are required.');
-      }
-    }
+  }
+
+  private buildProviderContext(idempotencyKey: string, meta: RequestMeta): ProviderContext {
+    return {
+      idempotencyKey,
+      correlationId: crypto.randomUUID(),
+      requestId: meta.requestId,
+    };
   }
 
   private hashPayload(payload: unknown) {
@@ -557,4 +715,6 @@ export type RequestMeta = {
   requestId?: string;
   ip?: string;
   userAgent?: string;
+  deviceId?: string;
+  country?: string;
 };

@@ -3,7 +3,8 @@ import { z } from 'zod';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { PaymentsService } from './payments.service';
-import type { MomoProviderName } from './providers/momo.provider.interface';
+import { normalizeIdempotencyKey } from './idempotency';
+import type { ProviderName } from '../modules/payments/providers/provider.interface';
 
 const createIntentSchema = z.object({
   tripId: z.string().min(1),
@@ -21,7 +22,7 @@ const confirmIntentSchema = z.object({
 
 const payoutSchema = z.object({
   amount: z.coerce.number().positive(),
-  provider: z.string().min(1),
+  provider: z.enum(['mock', 'mtn', 'vodafone', 'airteltigo']),
   destinationPhone: z.string().min(8),
 });
 
@@ -32,7 +33,8 @@ export class PaymentsController {
   @Post('payments/intents')
   @UseGuards(JwtAuthGuard)
   async createIntent(@Body() body: unknown, @Headers('idempotency-key') idempotencyKey: string | undefined, @Req() req: Request & { user?: { id: string; role?: string } }) {
-    if (!idempotencyKey) throw new BadRequestException('Idempotency-Key is required.');
+    const idKey = normalizeIdempotencyKey(idempotencyKey);
+    if (!idKey) throw new BadRequestException('Idempotency-Key is required.');
     const parsed = createIntentSchema.safeParse(body);
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.issues.map((issue) => issue.message).join('; '));
@@ -51,14 +53,16 @@ export class PaymentsController {
         riderId,
         amount: payload.amount,
         currency: payload.currency,
-        provider: payload.provider as MomoProviderName,
+        provider: payload.provider as ProviderName,
         phoneNumber: payload.phoneNumber,
       },
-      idempotencyKey,
+      idKey,
       {
         requestId: req.requestId,
         ip: req.ip,
         userAgent: req.headers['user-agent'],
+        deviceId: typeof req.headers['x-device-id'] === 'string' ? req.headers['x-device-id'] : undefined,
+        country: typeof req.headers['x-client-country'] === 'string' ? req.headers['x-client-country'] : undefined,
       }
     );
   }
@@ -71,7 +75,8 @@ export class PaymentsController {
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Req() req: Request & { user?: { role?: string } }
   ) {
-    if (!idempotencyKey) throw new BadRequestException('Idempotency-Key is required.');
+    const idKey = normalizeIdempotencyKey(idempotencyKey);
+    if (!idKey) throw new BadRequestException('Idempotency-Key is required.');
     const parsed = confirmIntentSchema.safeParse(body);
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.issues.map((issue) => issue.message).join('; '));
@@ -84,11 +89,13 @@ export class PaymentsController {
         phoneNumber: payload.phoneNumber,
         driverId: payload.driverId,
       },
-      idempotencyKey,
+      idKey,
       {
         requestId: req.requestId,
         ip: req.ip,
         userAgent: req.headers['user-agent'],
+        deviceId: typeof req.headers['x-device-id'] === 'string' ? req.headers['x-device-id'] : undefined,
+        country: typeof req.headers['x-client-country'] === 'string' ? req.headers['x-client-country'] : undefined,
       }
     );
   }
@@ -109,7 +116,8 @@ export class PaymentsController {
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Req() req: Request & { user?: { id: string; role?: string } }
   ) {
-    if (!idempotencyKey) throw new BadRequestException('Idempotency-Key is required.');
+    const idKey = normalizeIdempotencyKey(idempotencyKey);
+    if (!idKey) throw new BadRequestException('Idempotency-Key is required.');
     const parsed = payoutSchema.safeParse(body);
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.issues.map((issue) => issue.message).join('; '));
@@ -124,7 +132,7 @@ export class PaymentsController {
       payload.amount,
       payload.provider,
       payload.destinationPhone,
-      idempotencyKey,
+      idKey,
       {
         requestId: req.requestId,
         ip: req.ip,

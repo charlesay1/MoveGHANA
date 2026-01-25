@@ -11,6 +11,7 @@ import { RidesModule } from './rides/rides.module';
 import { FareModule } from './fare/fare.module';
 import { DbModule } from './db/db.module';
 import { PaymentsModule } from './payments/payments.module';
+import { OpsModule } from './ops/ops.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { PaymentsModule } from './payments/payments.module';
     RidesModule,
     FareModule,
     PaymentsModule,
+    OpsModule,
   ],
   controllers: [HealthController, MetricsController],
   providers: [

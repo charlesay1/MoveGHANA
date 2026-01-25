@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Headers, Param, Post } from '@nestjs/common';
 import type { Request } from 'express';
 import { PaymentsService } from '../payments.service';
-import type { MomoProviderName } from '../providers/momo.provider.interface';
+import type { ProviderName } from '../../modules/payments/providers/provider.interface';
 
 @Controller('v1/payments/webhooks')
 export class WebhooksController {
@@ -9,7 +9,7 @@ export class WebhooksController {
 
   @Post(':provider')
   async handleWebhook(
-    @Param('provider') provider: MomoProviderName,
+    @Param('provider') provider: ProviderName,
     @Body() body: unknown,
     @Headers() headers: Request['headers']
   ) {

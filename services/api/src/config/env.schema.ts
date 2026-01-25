@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  APP_ENV: z.enum(['dev', 'staging', 'prod']).optional(),
   PORT: z.coerce.number().int().positive().optional(),
   API_PORT: z.coerce.number().int().positive().optional(),
   DATABASE_URL: z.string().min(1).optional(),
@@ -18,6 +19,9 @@ export const envSchema = z.object({
   BODY_LIMIT: z.string().optional().default('1mb'),
   REDIS_URL: z.string().optional(),
   PAYMENTS_PROVIDER: z.enum(['mock', 'mtn', 'vodafone', 'airteltigo']).default('mock'),
+  PAYMENTS_PROVIDER_MODE: z.enum(['mock', 'live']).default('mock'),
+  PAYMENTS_PUBLIC_URL: z.string().optional(),
+  PAYMENTS_SECRETS_DIR: z.string().optional(),
   PAYMENTS_WEBHOOK_SECRET: z.string().optional(),
   MTN_MOMO_BASE_URL: z.string().optional(),
   MTN_MOMO_API_KEY: z.string().optional(),
@@ -28,6 +32,13 @@ export const envSchema = z.object({
   AIRTELTIGO_MOMO_BASE_URL: z.string().optional(),
   AIRTELTIGO_MOMO_API_KEY: z.string().optional(),
   AIRTELTIGO_MOMO_API_SECRET: z.string().optional(),
+  FRAUD_MAX_AMOUNT: z.coerce.number().positive().default(500),
+  FRAUD_RIDER_PER_MIN: z.coerce.number().int().positive().default(3),
+  FRAUD_RIDER_PER_DAY: z.coerce.number().int().positive().default(20),
+  FRAUD_DEVICE_PER_DAY: z.coerce.number().int().positive().default(10),
+  FRAUD_PHONE_PER_DAY: z.coerce.number().int().positive().default(10),
+  FRAUD_HOLD_SCORE: z.coerce.number().int().positive().default(70),
+  FRAUD_BLOCK_SCORE: z.coerce.number().int().positive().default(90),
 });
 
 export type EnvSchema = z.infer<typeof envSchema>;

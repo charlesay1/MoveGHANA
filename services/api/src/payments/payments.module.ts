@@ -6,10 +6,12 @@ import { LedgerService } from './ledger/ledger.service';
 import { CommissionService } from './commission/commission.service';
 import { PayoutsService } from './payouts/payouts.service';
 import { WebhooksController } from './webhooks/webhooks.controller';
-import { MockProvider } from './providers/mock.provider';
-import { MtnProvider } from './providers/mtn.provider';
-import { VodafoneProvider } from './providers/vodafone.provider';
-import { AirtelTigoProvider } from './providers/airteltigo.provider';
+import { MockProvider } from '../modules/payments/providers/mock.provider';
+import { MtnMomoProvider } from '../modules/payments/providers/mtn.momo.provider';
+import { VodafoneCashProvider } from '../modules/payments/providers/vodafone.cash.provider';
+import { AirtelTigoMoneyProvider } from '../modules/payments/providers/airteltigo.money.provider';
+import { FraudService } from './fraud/fraud.service';
+import { GovernanceService } from './governance/governance.service';
 
 @Module({
   imports: [DbModule],
@@ -19,10 +21,12 @@ import { AirtelTigoProvider } from './providers/airteltigo.provider';
     LedgerService,
     CommissionService,
     PayoutsService,
+    FraudService,
+    GovernanceService,
     MockProvider,
-    MtnProvider,
-    VodafoneProvider,
-    AirtelTigoProvider,
+    MtnMomoProvider,
+    VodafoneCashProvider,
+    AirtelTigoMoneyProvider,
   ],
   exports: [PaymentsService],
 })
