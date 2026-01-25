@@ -1,16 +1,55 @@
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { useBooking } from '../context/BookingProvider';
 import { Screen } from '../components/Screen';
+import { useSession } from '../session/SessionProvider';
+import { confirmPaymentIntent, createIdempotencyKey, createPaymentIntent } from '../services/paymentService';
 
 export const FarePreviewScreen: React.FC<{ onRequest: () => void; onBack: () => void }> = ({
   onRequest,
   onBack,
 }) => {
   const { pickup, destination, mode, fare, distanceKm } = useBooking();
+  const { state } = useSession();
+  const [paymentMethod, setPaymentMethod] = useState<'momo' | 'wallet'>('momo');
+  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const canRequest = Boolean(pickup && destination && mode && fare);
+
+  const handleRequest = async () => {
+    if (!canRequest || processing) return;
+    if (!state.user?.id || !state.phone || !fare) {
+      setError('Complete your profile before paying.');
+      return;
+    }
+    setProcessing(true);
+    setError(null);
+    try {
+      const intent = await createPaymentIntent(
+        {
+          tripId: `${pickup?.label ?? 'trip'}_${Date.now()}`,
+          riderId: state.user.id,
+          amount: fare.total,
+          currency: fare.currency,
+          provider: 'mock',
+          phoneNumber: state.phone,
+        },
+        createIdempotencyKey()
+      );
+      await confirmPaymentIntent(
+        intent.intentId,
+        { phoneNumber: state.phone, driverId: 'driver_mock' },
+        createIdempotencyKey()
+      );
+      onRequest();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Payment failed.');
+    } finally {
+      setProcessing(false);
+    }
+  };
 
   return (
     <Screen>
@@ -32,7 +71,35 @@ export const FarePreviewScreen: React.FC<{ onRequest: () => void; onBack: () => 
           </Text>
         )}
       </View>
-      <TouchableOpacity style={[styles.cta, !canRequest && styles.ctaDisabled]} onPress={onRequest} disabled={!canRequest}>
+      <View style={styles.card}>
+        <Text style={styles.label}>Payment method</Text>
+        <View style={styles.paymentRow}>
+          <TouchableOpacity
+            style={[styles.paymentOption, paymentMethod === 'momo' && styles.paymentOptionActive]}
+            onPress={() => setPaymentMethod('momo')}
+          >
+            <Text style={styles.paymentText}>Mobile Money</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.paymentOption, paymentMethod === 'wallet' && styles.paymentOptionActive]}
+            onPress={() => setPaymentMethod('wallet')}
+          >
+            <Text style={styles.paymentText}>MoveGH Wallet</Text>
+          </TouchableOpacity>
+        </View>
+        {processing && (
+          <View style={styles.processingRow}>
+            <ActivityIndicator size="small" />
+            <Text style={styles.processingText}>Processing payment...</Text>
+          </View>
+        )}
+        {error && <Text style={styles.errorText}>{error}</Text>}
+      </View>
+      <TouchableOpacity
+        style={[styles.cta, (!canRequest || processing) && styles.ctaDisabled]}
+        onPress={handleRequest}
+        disabled={!canRequest || processing}
+      >
         <Text style={styles.ctaText}>Request Ride</Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={onBack}>
@@ -52,4 +119,11 @@ const styles = StyleSheet.create({
   ctaDisabled: { opacity: 0.5 },
   ctaText: { color: colors.white, fontWeight: '700' },
   backText: { marginTop: 12, color: colors.slate, textAlign: 'center' },
+  paymentRow: { flexDirection: 'row', gap: 12, marginTop: 8 },
+  paymentOption: { flex: 1, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.slate },
+  paymentOptionActive: { borderColor: colors.ghGreen, backgroundColor: colors.mint },
+  paymentText: { textAlign: 'center', color: colors.black, fontWeight: '600' },
+  processingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
+  processingText: { color: colors.slate },
+  errorText: { color: colors.danger, marginTop: 8 },
 });
