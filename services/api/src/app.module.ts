@@ -10,6 +10,7 @@ import { MetricsController } from './metrics/metrics.controller';
 import { RidesModule } from './rides/rides.module';
 import { FareModule } from './fare/fare.module';
 import { DbModule } from './db/db.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { DbModule } from './db/db.module';
     GeoModule,
     RidesModule,
     FareModule,
+    PaymentsModule,
   ],
   controllers: [HealthController, MetricsController],
   providers: [

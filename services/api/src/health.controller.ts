@@ -1,12 +1,13 @@
-import { Controller, Get, HttpStatus, Req, Res } from '@nestjs/common';
+import { Controller, Get, HttpStatus, Optional, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { DbService } from './db/db.module';
 import { config } from './config/config';
 import net from 'net';
+import { PaymentsService } from './payments/payments.service';
 
 @Controller()
 export class HealthController {
-  constructor(private readonly db: DbService) {}
+  constructor(private readonly db: DbService, @Optional() private readonly payments?: PaymentsService) {}
 
   @Get('health')
   health(@Req() req: Request) {
@@ -25,7 +26,13 @@ export class HealthController {
     const readiness = await this.db.readiness();
     const redisStatus = await this.checkRedis();
     const redisOk = redisStatus === 'up' || redisStatus === 'not_configured';
-    const ok = readiness.dbUp && readiness.migrationsApplied && redisOk;
+    let paymentsStatus: 'up' | 'down' | 'degraded' | 'skipped' = 'skipped';
+    if (config.NODE_ENV === 'development' && this.payments) {
+      const health = await this.payments.providerHealth();
+      paymentsStatus = health === 'ok' ? 'up' : health === 'down' ? 'down' : 'degraded';
+    }
+    const paymentsOk = paymentsStatus !== 'down';
+    const ok = readiness.dbUp && readiness.migrationsApplied && redisOk && paymentsOk;
     res.status(ok ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE);
     return {
       status: ok ? 'ok' : 'degraded',
@@ -34,6 +41,7 @@ export class HealthController {
         db: readiness.dbUp ? 'up' : 'down',
         migrations: readiness.migrationsApplied ? 'up' : 'down',
         redis: redisStatus,
+        payments: paymentsStatus,
       },
       timestamp: new Date().toISOString(),
       requestId: req.requestId,

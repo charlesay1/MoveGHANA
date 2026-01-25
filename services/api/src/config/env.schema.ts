@@ -17,6 +17,17 @@ export const envSchema = z.object({
   RATE_LIMIT_AUTH: z.coerce.number().int().positive().default(5),
   BODY_LIMIT: z.string().optional().default('1mb'),
   REDIS_URL: z.string().optional(),
+  PAYMENTS_PROVIDER: z.enum(['mock', 'mtn', 'vodafone', 'airteltigo']).default('mock'),
+  PAYMENTS_WEBHOOK_SECRET: z.string().optional(),
+  MTN_MOMO_BASE_URL: z.string().optional(),
+  MTN_MOMO_API_KEY: z.string().optional(),
+  MTN_MOMO_API_SECRET: z.string().optional(),
+  VODAFONE_MOMO_BASE_URL: z.string().optional(),
+  VODAFONE_MOMO_API_KEY: z.string().optional(),
+  VODAFONE_MOMO_API_SECRET: z.string().optional(),
+  AIRTELTIGO_MOMO_BASE_URL: z.string().optional(),
+  AIRTELTIGO_MOMO_API_KEY: z.string().optional(),
+  AIRTELTIGO_MOMO_API_SECRET: z.string().optional(),
 });
 
 export type EnvSchema = z.infer<typeof envSchema>;
