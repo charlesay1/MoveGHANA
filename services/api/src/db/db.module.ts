@@ -1,5 +1,5 @@
 import { Injectable, Module, OnModuleDestroy } from '@nestjs/common';
-import { Pool } from 'pg';
+import { Pool, PoolClient } from 'pg';
 import { config } from '../config/config';
 
 @Injectable()
@@ -13,6 +13,21 @@ export class DbService implements OnModuleDestroy {
 
   async query<T = unknown>(text: string, params?: unknown[]) {
     return this.pool.query<T>(text, params);
+  }
+
+  async transaction<T>(handler: (client: PoolClient) => Promise<T>): Promise<T> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await handler(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async readiness(): Promise<{ dbUp: boolean; migrationsApplied: boolean }> {
@@ -43,7 +58,7 @@ export class DbService implements OnModuleDestroy {
     try {
       const result = await this.withTimeout(
         this.pool.query(
-          "SELECT to_regclass('public.users') AS users, to_regclass('public.otp_codes') AS otp_codes, to_regclass('public.sessions') AS sessions"
+          "SELECT to_regclass('public.users') AS users, to_regclass('public.otp_codes') AS otp_codes, to_regclass('public.sessions') AS sessions, to_regclass('public.wallets') AS wallets, to_regclass('public.payment_intents') AS payment_intents"
         ),
         2000
       );
@@ -51,8 +66,10 @@ export class DbService implements OnModuleDestroy {
         users: string | null;
         otp_codes: string | null;
         sessions: string | null;
+        wallets: string | null;
+        payment_intents: string | null;
       };
-      return Boolean(row?.users && row?.otp_codes && row?.sessions);
+      return Boolean(row?.users && row?.otp_codes && row?.sessions && row?.wallets && row?.payment_intents);
     } catch {
       return false;
     }
