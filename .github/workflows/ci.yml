@@ -36,6 +36,42 @@ jobs:
       - run: pnpm install
       - run: pnpm test
 
+  migrations:
+    runs-on: ubuntu-latest
+    needs: lint-and-typecheck
+    services:
+      postgres:
+        image: postgres:16.2
+        env:
+          POSTGRES_DB: movegh_core
+          POSTGRES_USER: movegh_admin
+          POSTGRES_PASSWORD: movegh_admin_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U movegh_admin -d movegh_core"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install
+      - run: pnpm --filter movegh-api db:migrate
+        env:
+          DATABASE_URL: postgresql://movegh_admin:movegh_admin_password@localhost:5432/movegh_core
+          JWT_SECRET: movegh-dev-secret
+      - run: pnpm --filter movegh-api db:rollback
+        env:
+          DATABASE_URL: postgresql://movegh_admin:movegh_admin_password@localhost:5432/movegh_core
+          JWT_SECRET: movegh-dev-secret
+
   build:
     runs-on: ubuntu-latest
     needs: lint-and-typecheck
