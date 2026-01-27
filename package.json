@@ -31,14 +31,23 @@
     "lint": "turbo run lint",
     "test": "turbo run test",
     "format": "prettier -w .",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "turbo run typecheck",
+    "eas": "bash scripts/eas-ipv4.sh",
+    "eas:whoami": "bash scripts/eas-ipv4.sh whoami"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.7",
+    "@react-native/gradle-plugin": "^0.83.1",
+    "@types/react": "^18.3.27",
+    "@types/react-dom": "^18.3.7",
     "concurrently": "^9.1.0",
     "eslint": "^9.11.1",
     "prettier": "^3.3.3",
     "turbo": "^2.1.3",
     "typescript": "^5.6.3"
+  },
+  "dependencies": {
+    "expo": "^51.0.39",
+    "expo-dev-client": "~4.0.29"
   }
 }
